@@ -337,6 +337,12 @@ For each issue worth commenting on:
      the finding's location -- no surrounding context, no explanation, just
      the fixed code.
 
+     **Indentation matters.** The suggestion replaces the original line(s)
+     verbatim. You must match the exact indentation (spaces/tabs) of the
+     original code. Read the file from disk to see the actual indentation at
+     the finding's line, then reproduce it in your suggestion. A suggestion
+     with wrong indentation will produce a broken diff.
+
    - **For architectural issues** where the fix spans multiple files or there
      are multiple valid approaches, still include a `suggestion` with the most
      likely correct code at the finding's location. Then use the `message` to

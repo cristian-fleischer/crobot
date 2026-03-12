@@ -1,0 +1,11 @@
+platform: github
+
+bitbucket:
+  workspace: testteam
+  repo: test-repo
+
+review:
+  max_comments: 50
+  dry_run: false
+  bot_label: mybot
+  severity_threshold: error

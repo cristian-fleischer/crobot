@@ -1,0 +1,12 @@
+🟠 **warning** (5/10) | ⚡ performance
+
+📋 **Criteria:** Performance, Maintainability
+
+String contains "special" <chars> & entities.
+
+```suggestion
+use &amp; properly
+```
+
+[//]: # "crobot:fp=special.go:new:10:special-fp"
+[//]: # "crobot:bot=crobot"

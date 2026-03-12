@@ -1,0 +1,8 @@
+🔴 **error** (9/10) | 🐛 bug
+
+📋 **Criteria:** Reliability
+
+Nil pointer dereference on line 15.
+
+[//]: # "crobot:fp=main.go:new:15:nil-deref"
+[//]: # "crobot:bot=crobot"

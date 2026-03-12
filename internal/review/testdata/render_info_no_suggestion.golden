@@ -1,0 +1,8 @@
+🔵 **info** (3/10) | 🎨 style
+
+📋 **Criteria:** Readability
+
+Consider using a constant here.
+
+[//]: # "crobot:fp=util.go:new:8:use-const"
+[//]: # "crobot:bot=crobot"

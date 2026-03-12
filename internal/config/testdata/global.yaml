@@ -1,0 +1,5 @@
+platform: gitlab
+
+review:
+  bot_label: globalbot
+  max_comments: 30

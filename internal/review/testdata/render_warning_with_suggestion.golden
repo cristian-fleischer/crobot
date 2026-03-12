@@ -1,0 +1,12 @@
+🟠 **warning** (7/10) | 🔒 security
+
+📋 **Criteria:** Security, Maintainability
+
+Logging the raw token can leak credentials.
+
+```suggestion
+log.Info("auth completed")
+```
+
+[//]: # "crobot:fp=src/auth.ts:new:42:token-log"
+[//]: # "crobot:bot=crobot"

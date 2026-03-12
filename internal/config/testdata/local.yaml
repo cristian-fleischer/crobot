@@ -1,0 +1,3 @@
+review:
+  max_comments: 15
+  bot_label: localbot

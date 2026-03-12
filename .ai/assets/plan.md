@@ -334,7 +334,7 @@ type Comment struct {
 ```json
 {
   "content": {
-    "raw": "**warning** | security\n\nLogging the raw token can leak credentials.\n\n<!-- crobot:fp=src/auth.ts:new:42:token-log -->"
+    "raw": "**warning** | security\n\nLogging the raw token can leak credentials.\n\n[//]: # \"crobot:fp=src/auth.ts:new:42:token-log\""
   },
   "inline": {
     "path": "src/auth.ts",
@@ -345,7 +345,7 @@ type Comment struct {
 
 - `inline.to` = line in the new version of the file (side = "new")
 - `inline.from` = line in the old version (side = "old")
-- `<!-- crobot:fp=... -->` is used for deduplication on reruns.
+- `[//]: # "crobot:fp=..."` is used for deduplication on reruns.
 
 ---
 
@@ -364,7 +364,7 @@ all phases. It operates on the shared types.
 ### Deduplication
 
 - Fetch existing bot comments via `ListBotComments`.
-- Extract fingerprints from existing comments (`<!-- crobot:fp=... -->`).
+- Extract fingerprints from existing comments (`[//]: # "crobot:fp=..."`).
 - Skip any finding whose fingerprint already exists.
 
 ### Comment Rendering

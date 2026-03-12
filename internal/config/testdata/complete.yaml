@@ -1,0 +1,27 @@
+platform: bitbucket
+
+bitbucket:
+  workspace: myteam
+  repo: my-service
+
+review:
+  max_comments: 25
+  dry_run: true
+  bot_label: crobot
+  severity_threshold: warning
+
+agent:
+  default: claude
+  agents:
+    claude:
+      command: claude
+      args: ["--model", "sonnet-4"]
+  timeout: 300
+
+ai:
+  default_provider: anthropic
+  providers:
+    anthropic:
+      model: claude-sonnet-4-20250514
+  max_tokens: 8192
+  temperature: 0.2

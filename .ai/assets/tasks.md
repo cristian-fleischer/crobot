@@ -239,50 +239,122 @@
 
 ---
 
-## Phase 4: Direct AI Provider APIs
+## Phase 4: Native Agent SDK Adapters
+
+> Tests: Each SDK adapter must have unit tests for bridge subprocess management,
+> configuration mapping, and event parsing. Integration tests must use mock
+> bridge processes to verify the full review flow. Use `//go:build integration`
+> for tests that use real SDKs.
+
+### P4.1 SDK Adapter Interface
+
+- [ ] P4.1.1 Define `AgentSDKAdapter` interface (`internal/agentsdk/adapter.go`)
+  - [ ] `Review(ctx, SDKReviewRequest) (*SDKReviewResult, error)`
+  - [ ] `Name() string`
+  - [ ] `Capabilities() AdapterCapabilities`
+- [ ] P4.1.2 Define `SDKReviewRequest`, `SDKReviewResult`, `AdapterCapabilities` structs
+- [ ] P4.1.3 Implement adapter factory (`internal/agentsdk/factory.go`)
+
+### P4.2 Bridge Process Infrastructure
+
+- [ ] P4.2.1 Bridge subprocess manager (`internal/agentsdk/bridge.go`)
+  - [ ] Spawn bridge process (Node.js or Python) as subprocess
+  - [ ] Send configuration as JSON over stdin
+  - [ ] Read newline-delimited JSON events from stdout
+  - [ ] Handle stderr for bridge-level logging
+  - [ ] Timeout and graceful shutdown
+  - [ ] Unit tests with mock bridge process
+- [ ] P4.2.2 Event stream parser
+  - [ ] Parse typed events (assistant_message, tool_use, tool_result, finding, usage, error)
+  - [ ] Extract `ReviewFinding[]` from event stream
+  - [ ] Unit tests with sample event streams
+
+### P4.3 Claude Code Agent SDK Adapter
+
+- [ ] P4.3.1 Claude SDK adapter (`internal/agentsdk/claude/adapter.go`)
+  - [ ] Map `SDKReviewRequest` to Claude SDK options (model, permissions, tools)
+  - [ ] Configure `permission_mode: rejectEdits`, `allowed_tools`
+  - [ ] Inject CRoBot tools as custom MCP tools
+  - [ ] Parse streaming events into `ReviewFinding[]`
+  - [ ] Unit tests
+- [ ] P4.3.2 Claude bridge script (`internal/agentsdk/claude/bridge.js`)
+  - [ ] Import `@anthropic-ai/claude-code` SDK
+  - [ ] Create `ClaudeSDKClient` session from stdin config
+  - [ ] Register CRoBot tools via `create_sdk_mcp_server()`
+  - [ ] Stream typed events to stdout
+  - [ ] Handle errors and cleanup
+  - [ ] Integration test with mock SDK
+
+### P4.4 OpenAI Agents SDK Adapter
+
+- [ ] P4.4.1 Codex SDK adapter (`internal/agentsdk/codex/adapter.go`)
+  - [ ] Map `SDKReviewRequest` to OpenAI Agents SDK options
+  - [ ] Define CRoBot tools as SDK tool functions
+  - [ ] Use structured output type for `ReviewFinding[]`
+  - [ ] Configure guardrails (findings must be within diff)
+  - [ ] Unit tests
+- [ ] P4.4.2 Codex bridge script (`internal/agentsdk/codex/bridge.py`)
+  - [ ] Import `agents` SDK
+  - [ ] Create `Agent` with instructions, tools, output type
+  - [ ] Run `Runner.run()` with PR context
+  - [ ] Output structured results to stdout
+  - [ ] Integration test with mock SDK
+
+### P4.5 CLI Integration
+
+- [ ] P4.5.1 Extend `review` command with `--sdk` flag
+  - [ ] `--sdk claude` selects Claude Agent SDK adapter
+  - [ ] `--sdk codex` selects OpenAI Agents SDK adapter
+- [ ] P4.5.2 Wire adapter selection (config-driven + CLI override)
+- [ ] P4.5.3 SDK adapter config loading from YAML (`agent_sdk` section)
+- [ ] P4.5.4 Integration tests with mock bridge processes
+
+---
+
+## Phase 5: Direct AI Provider APIs
 
 > Tests: Each AI provider must have unit tests using recorded HTTP responses
 > (no real API calls in default test runs). Shared prompt templates and finding
 > parsers must have thorough table-driven tests. Use `//go:build integration`
 > for tests that hit real APIs.
 
-### P4.1 AI Provider Interface
+### P5.1 AI Provider Interface
 
-- [ ] P4.1.1 Define `AIProvider` interface (`internal/ai/provider.go`)
+- [ ] P5.1.1 Define `AIProvider` interface (`internal/ai/provider.go`)
   - [ ] `Review(ctx, ReviewRequest) ([]ReviewFinding, error)`
   - [ ] `Name() string`
-- [ ] P4.1.2 Define `ReviewRequest` struct
-- [ ] P4.1.3 Implement provider factory (`internal/ai/factory.go`)
-- [ ] P4.1.4 Shared prompt templates (`internal/ai/prompt.go`)
+- [ ] P5.1.2 Define `ReviewRequest` struct
+- [ ] P5.1.3 Implement provider factory (`internal/ai/factory.go`)
+- [ ] P5.1.4 Shared prompt templates (`internal/ai/prompt.go`)
 
-### P4.2 Provider Implementations
+### P5.2 Provider Implementations
 
-- [ ] P4.2.1 Anthropic Claude API (`internal/ai/anthropic/client.go`)
+- [ ] P5.2.1 Anthropic Claude API (`internal/ai/anthropic/client.go`)
   - [ ] HTTP client with Messages API
   - [ ] Request/response mapping
   - [ ] Parse `ReviewFinding[]` from response
   - [ ] Unit tests
-- [ ] P4.2.2 OpenAI GPT API (`internal/ai/openai/client.go`)
+- [ ] P5.2.2 OpenAI GPT API (`internal/ai/openai/client.go`)
   - [ ] HTTP client with Chat Completions API
   - [ ] Request/response mapping
   - [ ] Parse findings
   - [ ] Unit tests
-- [ ] P4.2.3 Google Gemini API (`internal/ai/google/client.go`)
+- [ ] P5.2.3 Google Gemini API (`internal/ai/google/client.go`)
   - [ ] HTTP client with Gemini API
   - [ ] Request/response mapping
   - [ ] Parse findings
   - [ ] Unit tests
-- [ ] P4.2.4 OpenRouter API (`internal/ai/openrouter/client.go`)
+- [ ] P5.2.4 OpenRouter API (`internal/ai/openrouter/client.go`)
   - [ ] HTTP client (OpenAI-compatible format)
   - [ ] Request/response mapping
   - [ ] Parse findings
   - [ ] Unit tests
 
-### P4.3 CLI Integration
+### P5.3 CLI Integration
 
-- [ ] P4.3.1 Extend `review` command with `--provider` and `--model` flags
-- [ ] P4.3.2 Wire provider selection (config-driven + CLI override)
-- [ ] P4.3.3 Integration tests with recorded API responses
+- [ ] P5.3.1 Extend `review` command with `--provider` and `--model` flags
+- [ ] P5.3.2 Wire provider selection (config-driven + CLI override)
+- [ ] P5.3.3 Integration tests with recorded API responses
 
 ---
 

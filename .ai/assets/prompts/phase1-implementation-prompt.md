@@ -165,7 +165,7 @@ Read the "Testing Philosophy" section in `.ai/plan.md` carefully. Key rules:
 ## Go Module and Dependencies
 
 - Module path: use an appropriate module path (check if one exists in `go.mod`,
-  otherwise use `github.com/dizzyc/crobot` or similar).
+  otherwise use `github.com/cristian-fleischer/crobot` or similar).
 - Use `cobra` for CLI framework.
 - Use `gopkg.in/yaml.v3` for YAML parsing (or `github.com/goccy/go-yaml`).
 - Prefer the Go standard library for HTTP, JSON, testing, etc.

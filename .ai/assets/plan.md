@@ -5,7 +5,7 @@
 CRoBot is a local-first CLI tool written in Go that enables AI-powered automated
 code reviews on pull requests, posting real inline review comments.
 
-The tool is built in four progressive phases:
+The tool is built in five progressive phases:
 
 1. **Phase 1 (MVP)**: CLI commands + Bitbucket Cloud + review engine. AI coding
    agents (Claude Code, Codex CLI, OpenCode, etc.) invoke CRoBot via shell
@@ -15,7 +15,11 @@ The tool is built in four progressive phases:
 3. **Phase 3 (ACP)**: CRoBot becomes the single entry point. It acts as an ACP
    client, spawning and orchestrating an ACP-compatible coding agent subprocess
    to perform the review end-to-end.
-4. **Phase 4 (Direct AI Providers)**: CRoBot calls AI provider APIs directly
+4. **Phase 4 (Native Agent SDKs)**: For agents with rich proprietary SDKs that
+   go beyond ACP (Claude Code Agent SDK, OpenAI Agents SDK), CRoBot uses
+   dedicated adapters that unlock advanced features like tool injection,
+   streaming, permission control, and hooks.
+5. **Phase 5 (Direct AI Providers)**: CRoBot calls AI provider APIs directly
    (Anthropic, OpenAI, Google, OpenRouter, etc.), removing the need for an
    external coding agent entirely.
 
@@ -72,22 +76,22 @@ The architecture is layered so that each phase extends the system without
 modifying lower layers.
 
 ```
-                      Phase 4                Phase 3               Phase 1
-                 +--------------+      +--------------+      +--------------+
-                 | Direct AI    |      | ACP Client   |      | External     |
-                 | Provider     |      | (CRoBot      |      | AI Agent     |
-                 | (Anthropic,  |      |  spawns agent |      | (Claude Code,|
-                 |  OpenAI ...) |      |  subprocess)  |      |  Codex, ...) |
-                 +------+-------+      +------+-------+      +------+-------+
-                        |                     |                      |
-                        v                     v                      v
-               +--------------------------------------------------+
-               |              Analysis Layer                       |
-               |  internal/analysis/                               |
-               |                                                   |
-               |  Prompt construction, finding extraction,         |
-               |  AI provider abstraction                          |
-               +-------------------------+------------------------+
+    Phase 5          Phase 4              Phase 3               Phase 1
++--------------+ +--------------+  +---------------+      +--------------+
+| Direct AI    | | Native Agent |  | ACP Client    |      | External     |
+| Provider     | | SDK Adapters |  | (CRoBot       |      | AI Agent     |
+| (Anthropic,  | | (Claude SDK, |  |  spawns agent |      | (Claude Code,|
+|  OpenAI ...) | |  Codex SDK)  |  |  subprocess)  |      |  Codex, ...) |
++------+-------+ +------+-------+  +-------+-------+      +------+-------+
+       |                |                  |                     |
+       v                v                  v                     v
+      +------------------------------------------------------------+
+      |                       Analysis Layer                       |
+      |           internal/analysis/                               |
+      |                                                            |
+      |           Prompt construction, finding extraction,         |
+      |           AI provider abstraction                          |
+      +----------------------------------+-------------------------+
                                          |
                     +--------------------+--------------------+
                     |                                         |
@@ -167,7 +171,24 @@ agent:
       args: []
   timeout: 300                  # seconds, default 5 minutes
 
-# --- AI Provider (Phase 4: Direct API) ---
+# --- Native Agent SDKs (Phase 4) ---
+agent_sdk:
+  default: claude-sdk
+  adapters:
+    claude-sdk:
+      # Uses Claude Code Agent SDK (subprocess protocol)
+      model: claude-sonnet-4-20250514
+      permission_mode: reject_edits   # read-only for code review
+      max_turns: 50
+      allowed_tools: [Read, Glob, Grep]
+      # api_key from env: CROBOT_ANTHROPIC_API_KEY
+    codex-sdk:
+      # Uses OpenAI Agents SDK (subprocess protocol)
+      model: gpt-4.1
+      # api_key from env: CROBOT_OPENAI_API_KEY
+  timeout: 300                  # seconds, default 5 minutes
+
+# --- AI Provider (Phase 5: Direct API) ---
 ai:
   default_provider: anthropic
   providers:
@@ -198,11 +219,12 @@ ai:
 | `CROBOT_MAX_COMMENTS` | Max comments per run |
 | `CROBOT_DRY_RUN` | Default dry-run mode (true/false) |
 | `CROBOT_AGENT` | Default ACP agent name (Phase 3) |
-| `CROBOT_AI_PROVIDER` | Default AI provider (Phase 4) |
-| `CROBOT_ANTHROPIC_API_KEY` | Anthropic API key (Phase 4) |
-| `CROBOT_OPENAI_API_KEY` | OpenAI API key (Phase 4) |
-| `CROBOT_GOOGLE_API_KEY` | Google AI API key (Phase 4) |
-| `CROBOT_OPENROUTER_API_KEY` | OpenRouter API key (Phase 4) |
+| `CROBOT_AGENT_SDK` | Default native SDK adapter (Phase 4) |
+| `CROBOT_AI_PROVIDER` | Default AI provider (Phase 5) |
+| `CROBOT_ANTHROPIC_API_KEY` | Anthropic API key (Phase 4/5) |
+| `CROBOT_OPENAI_API_KEY` | OpenAI API key (Phase 4/5) |
+| `CROBOT_GOOGLE_API_KEY` | Google AI API key (Phase 5) |
+| `CROBOT_OPENROUTER_API_KEY` | OpenRouter API key (Phase 5) |
 
 ---
 
@@ -578,7 +600,179 @@ Full list: https://agentclientprotocol.com/get-started/agents
 
 ---
 
-## Phase 4: Direct AI Provider APIs
+## Phase 4: Native Agent SDK Adapters
+
+For agents with rich proprietary SDKs that offer capabilities beyond what ACP
+exposes, CRoBot uses dedicated adapters. This unlocks advanced features like
+custom tool injection, fine-grained permission control, typed streaming, and
+lifecycle hooks — features that ACP's generic protocol cannot express.
+
+```
+crobot review --pr 42 --sdk claude          # Claude Code Agent SDK
+crobot review --pr 42 --sdk codex           # OpenAI Agents SDK
+```
+
+### Why Not Just ACP?
+
+ACP is a lowest-common-denominator protocol. It standardizes basic agent
+communication (spawn, prompt, respond) but cannot express SDK-specific features:
+
+| Feature | ACP | Claude Agent SDK | OpenAI Agents SDK |
+|---------|-----|-----------------|-------------------|
+| Spawn subprocess | Yes | Yes | Yes |
+| Send prompt | Yes | Yes | Yes |
+| Stream response | Yes | Yes (typed events) | Yes |
+| Inject custom tools | No | **Yes** (in-process MCP) | **Yes** (tool defs) |
+| Permission control | Basic | **Full** (per-tool allow/deny) | Partial |
+| Hooks / interceptors | No | **Yes** (PreToolUse, etc.) | **Yes** (guardrails) |
+| Session forking | No | **Yes** | No |
+| Multi-turn context | Basic | **Full** (stateful client) | **Yes** (Runner) |
+| Agent handoffs | No | No | **Yes** |
+| Tracing / observability | No | Basic | **Yes** (built-in) |
+
+By using native SDKs, CRoBot can:
+1. **Inject CRoBot's own tools** directly into the agent's tool set (e.g.,
+   `get-file-snippet`, `list-bot-comments`) so the agent can call them
+   natively during its reasoning loop — no shell-out needed.
+2. **Enforce read-only mode** at the tool level (allow `Read`, `Glob`, `Grep`;
+   deny `Write`, `Edit`, `Bash`).
+3. **Hook into the agent loop** to monitor progress, enforce constraints, or
+   inject additional context mid-review.
+4. **Stream typed events** for real-time progress reporting.
+
+### Architecture
+
+```go
+// AgentSDKAdapter abstracts over different agent SDKs.
+type AgentSDKAdapter interface {
+    // Name returns the adapter identifier (e.g., "claude-sdk", "codex-sdk").
+    Name() string
+
+    // Review performs a complete code review using the native SDK.
+    // It receives the PR context and review configuration, and returns findings.
+    Review(ctx context.Context, opts SDKReviewRequest) (*SDKReviewResult, error)
+
+    // Capabilities returns what this adapter supports beyond basic review.
+    Capabilities() AdapterCapabilities
+}
+
+type SDKReviewRequest struct {
+    PRContext     *PRContext
+    SystemPrompt  string
+    ReviewPrompt  string
+    MaxTurns      int
+    AllowedTools  []string     // tools the agent may use
+    CustomTools   []ToolDef    // CRoBot tools injected into agent
+    Timeout       time.Duration
+}
+
+type SDKReviewResult struct {
+    Findings  []ReviewFinding
+    Events    []ReviewEvent    // streaming events for progress tracking
+    Usage     UsageStats       // tokens, cost, duration
+}
+
+type AdapterCapabilities struct {
+    SupportsToolInjection  bool
+    SupportsPermissions    bool
+    SupportsHooks          bool
+    SupportsStreaming       bool
+    SupportsMultiTurn      bool
+    SupportsHandoffs       bool
+}
+```
+
+### Claude Code Agent SDK Adapter
+
+The Claude Code Agent SDK (`@anthropic-ai/claude-code`) provides the richest
+programmatic interface of any coding agent. CRoBot wraps it via a Go subprocess
+that invokes the SDK.
+
+**How it works:**
+1. CRoBot spawns a small Node.js/Python bridge process that imports the Claude
+   Agent SDK.
+2. The bridge receives the review request (PR context, prompt, tool defs) as
+   JSON over stdin.
+3. The bridge creates a `ClaudeSDKClient` session with:
+   - Custom system prompt (CRoBot review instructions)
+   - `permission_mode: "rejectEdits"` (read-only)
+   - `allowed_tools: ["Read", "Glob", "Grep"]`
+   - CRoBot tools injected as in-process MCP tools via `create_sdk_mcp_server()`
+4. The bridge streams typed events (assistant messages, tool calls, results)
+   back to CRoBot over stdout.
+5. CRoBot parses the final output for `ReviewFinding[]` JSON.
+
+**Key advantages over ACP:**
+- Agent can natively call `get-file-snippet` and `list-bot-comments` as MCP
+  tools during its reasoning — deeper context retrieval without extra prompting.
+- Fine-grained tool permissions prevent any writes.
+- Hooks can intercept and log every tool call for auditability.
+- Typed streaming events enable real-time progress bars and cost tracking.
+
+### OpenAI Agents SDK Adapter
+
+The OpenAI Agents SDK (`openai-agents`) provides agent orchestration with
+tool definitions, guardrails, handoffs, and tracing.
+
+**How it works:**
+1. CRoBot spawns a Python bridge process that imports the Agents SDK.
+2. The bridge creates an `Agent` with:
+   - Custom instructions (CRoBot review prompt)
+   - Tool definitions (CRoBot tools as SDK tool functions)
+   - Output type schema (`ReviewFinding[]`)
+   - Optional guardrails (e.g., reject findings outside diff)
+3. The bridge runs `Runner.run()` with the PR context as input.
+4. Results (including structured `ReviewFinding[]` via output type) are
+   returned to CRoBot over stdout.
+
+**Key advantages over ACP:**
+- Structured output types ensure the agent returns valid `ReviewFinding[]`
+  without manual JSON parsing.
+- Guardrails can validate findings in-loop before the agent finalizes.
+- Built-in tracing provides detailed execution logs.
+
+### Bridge Process Design
+
+Both adapters use a **bridge process** pattern: a small script (Node.js for
+Claude SDK, Python for OpenAI SDK) that CRoBot spawns as a subprocess. The
+bridge:
+- Receives configuration as JSON on stdin
+- Imports and uses the native SDK
+- Streams events back as newline-delimited JSON on stdout
+- Exits when the review is complete
+
+Bridge scripts are bundled with the CRoBot binary (embedded via `go:embed`)
+or installed alongside it.
+
+```
+CRoBot (Go) ──stdin──► Bridge (Node.js/Python) ──SDK──► Agent
+             ◄─stdout──                         ◄──────
+```
+
+### Configuration
+
+```yaml
+agent_sdk:
+  default: claude-sdk
+  adapters:
+    claude-sdk:
+      model: claude-sonnet-4-20250514
+      permission_mode: reject_edits
+      max_turns: 50
+      allowed_tools: [Read, Glob, Grep]
+      custom_tools: true          # inject CRoBot tools into agent
+      hooks:
+        pre_tool_use: log         # log all tool calls
+    codex-sdk:
+      model: gpt-4.1
+      output_type: structured     # use SDK structured output
+      guardrails: true
+  timeout: 300
+```
+
+---
+
+## Phase 5: Direct AI Provider APIs
 
 CRoBot calls AI provider APIs directly, removing the need for any external
 coding agent. This makes CRoBot fully self-contained.
@@ -608,6 +802,11 @@ type ReviewRequest struct {
     Temperature float64
 }
 ```
+
+Note: Phase 5 shares the same review prompt templates with Phase 4's native SDK
+adapters (`internal/analysis/prompt.go`). The difference is that Phase 5 calls
+the AI model API directly, while Phase 4 delegates to a full coding agent that
+can use tools, browse code, and reason over multiple turns.
 
 ### Provider Implementations
 
@@ -651,7 +850,7 @@ CRoBot/
       comments.go                   # list-bot-comments          (P1)
       apply.go                      # apply-review-findings      (P1)
       serve.go                      # serve --mcp                (P2)
-      review.go                     # review --pr                (P3/P4)
+      review.go                     # review --pr                (P3/P4/P5)
 
     config/
       config.go                     # unified config loading     (P1)
@@ -688,18 +887,29 @@ CRoBot/
       parse.go                      # extract findings from resp (P3)
       config.go                     # agent config (cmd, args)   (P3)
 
+    agentsdk/
+      adapter.go                    # AgentSDKAdapter interface  (P4)
+      factory.go                    # NewAdapter() factory       (P4)
+      bridge.go                     # bridge subprocess mgmt     (P4)
+      claude/
+        adapter.go                  # Claude Agent SDK adapter   (P4)
+        bridge.js                   # Node.js bridge script      (P4)
+      codex/
+        adapter.go                  # OpenAI Agents SDK adapter  (P4)
+        bridge.py                   # Python bridge script       (P4)
+
     ai/
-      provider.go                   # AIProvider interface       (P4)
-      factory.go                    # NewProvider() factory      (P4)
-      prompt.go                     # shared prompt templates    (P4)
+      provider.go                   # AIProvider interface       (P5)
+      factory.go                    # NewProvider() factory      (P5)
+      prompt.go                     # shared prompt templates    (P5)
       anthropic/
-        client.go                   # Anthropic Claude API       (P4)
+        client.go                   # Anthropic Claude API       (P5)
       openai/
-        client.go                   # OpenAI GPT API             (P4)
+        client.go                   # OpenAI GPT API             (P5)
       google/
-        client.go                   # Google Gemini API          (P4)
+        client.go                   # Google Gemini API          (P5)
       openrouter/
-        client.go                   # OpenRouter API             (P4)
+        client.go                   # OpenRouter API             (P5)
       # Additional providers follow the same pattern
 
   CLAUDE.md                         # agent instructions         (P1)
@@ -720,13 +930,15 @@ CRoBot/
 
 ## How the `review` Command Works Across Phases
 
-The `crobot review` command is the unified entry point for Phase 3 and Phase 4.
+The `crobot review` command is the unified entry point for Phases 3, 4, and 5.
 It selects the analysis backend based on flags and config:
 
 ```
 crobot review --pr 42                         # uses default (config-driven)
 crobot review --pr 42 --agent claude          # Phase 3: ACP agent
-crobot review --pr 42 --provider anthropic    # Phase 4: direct API
+crobot review --pr 42 --sdk claude            # Phase 4: Claude Agent SDK
+crobot review --pr 42 --sdk codex             # Phase 4: OpenAI Agents SDK
+crobot review --pr 42 --provider anthropic    # Phase 5: direct API
 ```
 
 The `review` command orchestrates:
@@ -736,7 +948,8 @@ The `review` command orchestrates:
 2. Fetch PRContext from platform
 3. Analyze (one of):
    a. ACP agent (--agent): spawn subprocess, ACP handshake, prompt, parse
-   b. AI provider (--provider): call API directly, parse response
+   b. Native SDK (--sdk): spawn bridge, use SDK features, stream findings
+   c. AI provider (--provider): call API directly, parse response
 4. Validate findings against diff
 5. Deduplicate against existing bot comments
 6. Render comments
@@ -745,4 +958,141 @@ The `review` command orchestrates:
 ```
 
 Steps 4-8 are identical regardless of the analysis backend. The analysis layer
-(`internal/agent/` and `internal/ai/`) is the only part that differs.
+(`internal/agent/`, `internal/agentsdk/`, and `internal/ai/`) is the only part
+that differs.
+
+---
+
+## Potential Expansions
+
+Ideas and directions for future development, beyond the core 4-phase roadmap.
+These are captured here for reference and prioritization — they are not committed
+to any phase yet.
+
+### Multi-Agent Review Panel
+
+Instead of a single agent reviewing, spawn **multiple agents** in parallel, each
+with a different focus area or prompt, and synthesize the results:
+
+```
+PR Diff ──► Agent A (security focus)    ──► ┐
+       ──► Agent B (logic/bugs focus)   ──► ├─► Synthesizer ──► Final Findings
+       ──► Agent C (perf/arch focus)    ──► ┘
+```
+
+- Each agent reviews with a specialized system prompt and focus area.
+- A synthesizer (LLM call or rule-based) merges and deduplicates findings.
+- Consensus scoring: if 2/3 agents flag the same issue, confidence increases.
+- Reduces false positives and increases coverage across categories.
+- Could use different models per agent (e.g., Opus for security, Sonnet for
+  style) for cost optimization.
+
+### Multi-Pass Reviews
+
+Instead of a single review pass, run **multiple sequential passes** over the
+diff, each refining or deepening the analysis:
+
+1. **Pass 1 — Triage**: Quick scan to identify hotspots and categorize changes
+   (new feature, refactor, bugfix, config change, etc.).
+2. **Pass 2 — Deep Analysis**: Focused review of hotspot files, pulling in
+   additional context via `get-file-snippet` for surrounding code, call sites,
+   type definitions, etc.
+3. **Pass 3 — Cross-File Analysis**: Look for issues that span multiple files
+   (API contract mismatches, missing error handling propagation, inconsistent
+   patterns across the changeset).
+4. **Pass 4 — Consolidation**: Deduplicate, prioritize, and refine the final
+   findings. Drop low-confidence items, merge related findings.
+
+Each pass builds on the previous one's output. This produces higher-quality
+reviews at the cost of more API calls and latency. Could be configurable:
+`--review-depth quick|standard|deep` mapping to 1/2/4 passes.
+
+### AST-Aware Diff Parsing
+
+Enhance the diff parser to understand code structure, not just line changes:
+
+- Parse diffs into AST nodes (function added, method signature changed, import
+  removed, etc.) rather than raw line ranges.
+- Enables smarter context retrieval: automatically fetch the full function body
+  when only part of it changed, pull in callers of a modified function, etc.
+- Language-aware review: different review rules for different languages.
+- Could use tree-sitter for multi-language AST parsing.
+
+### Context Retrieval Enhancement
+
+Improve the context available to the reviewing agent beyond raw diffs:
+
+- **Call graph analysis**: When a function is modified, automatically identify
+  and include its callers and callees.
+- **Type/interface resolution**: When a type is used in the diff, include its
+  definition.
+- **Test coverage mapping**: Show which tests cover the changed code.
+- **Git blame context**: Who wrote the surrounding code and when, to help
+  calibrate review tone.
+- **Related PR history**: Previous reviews on the same files, to avoid
+  re-raising dismissed findings.
+
+### CRoBot as a DevOps MCP Tool Provider (Idea E)
+
+CRoBot already knows how to talk to Bitbucket/GitHub APIs. Extend it as a
+general-purpose **DevOps MCP server** — a toolkit that any AI agent can use to
+interact with development infrastructure:
+
+- PR creation/management tools
+- Issue tracking integration (Jira, Linear, GitHub Issues)
+- CI/CD status checking and trigger tools
+- Repository analytics and search
+- Branch management
+- Release management
+
+This would make CRoBot useful beyond code review — any AI agent connected via
+MCP could manage the full development lifecycle.
+
+### Review-as-a-Service (RaaS)
+
+Run CRoBot as a **persistent service** rather than a CLI:
+
+- **Webhook listener**: Auto-trigger reviews on PR creation/update via platform
+  webhooks (Bitbucket, GitHub, GitLab).
+- **Review queue**: Handle multiple PRs concurrently with configurable
+  parallelism and priority.
+- **Review memory / calibration**: Track which review comments get resolved vs
+  dismissed by developers. Build a feedback loop to adjust prompts, severity
+  thresholds, and categories over time. Per-repo "review profile" that adapts.
+- **Team configuration**: Different review profiles per repo/team (security-
+  focused, perf-focused, strict vs lenient, etc.).
+- **Dashboard**: Simple web UI showing review history, stats, false-positive
+  rate, cost per review.
+
+### PR Comment Fixer
+
+An agent-driven workflow to **automatically fix** issues raised in PR review
+comments:
+
+1. From the PR, identify the source branch.
+2. Automatically switch to that branch (or create a git worktree for isolation).
+3. Iterate through CR comments, determine which need fixing vs which are
+   informational or already addressed.
+4. For each fixable comment, apply the fix — one commit per fix for easy
+   revert if needed.
+5. Reply to / resolve the PR comment after fixing.
+6. Push the fix commits to the PR branch.
+
+This closes the loop: CRoBot finds issues, then CRoBot (or a connected agent)
+fixes them. Could be triggered via a CLI command (`crobot fix-pr --pr 42`) or
+automatically after a review.
+
+### Smart Routing & Cost Optimization
+
+Integrate intelligent model/provider routing (inspired by LiteLLM, Portkey):
+
+- **Rate-limit-aware routing**: Track remaining API quota per provider, route
+  to avoid hitting limits.
+- **Cost-based routing**: Route simple checks to cheap/fast models, escalate
+  complex analysis to capable models.
+- **Capability-based routing**: Different models for different review categories
+  (security vs style vs logic).
+- **Failover**: If one provider errors or rate-limits, transparently retry on
+  another.
+
+Could be built into Phase 5 or integrated via a separate project (AgentMux).

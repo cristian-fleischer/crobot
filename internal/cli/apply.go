@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/dizzyc/crobot/internal/config"
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/review"
+	"github.com/cristian-fleischer/crobot/internal/config"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/review"
 	"github.com/spf13/cobra"
 )
 

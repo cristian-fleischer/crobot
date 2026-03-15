@@ -24,7 +24,7 @@ jobs:
       - name: Build binaries
         run: |
           VERSION=${GITHUB_REF_NAME}
-          LDFLAGS="-s -w -X github.com/dizzyc/crobot/internal/cli.version=${VERSION}"
+          LDFLAGS="-s -w -X github.com/cristian-fleischer/crobot/internal/cli.version=${VERSION}"
           
           for GOOS in linux darwin windows; do
             for GOARCH in amd64 arm64; do

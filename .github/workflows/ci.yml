@@ -59,7 +59,7 @@ jobs:
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -ldflags "-s -w -X github.com/dizzyc/crobot/internal/cli.version=${{ github.sha }}" \
+          go build -ldflags "-s -w -X github.com/cristian-fleischer/crobot/internal/cli.version=${{ github.sha }}" \
             -o "crobot-${GOOS}-${GOARCH}${ext}" ./cmd/crobot
       - name: Upload binary
         uses: actions/upload-artifact@v4

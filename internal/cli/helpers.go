@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/dizzyc/crobot/internal/config"
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/platform/bitbucket"
+	"github.com/cristian-fleischer/crobot/internal/config"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform/bitbucket"
 )
 
 // buildPlatform creates a Platform instance from the loaded config.

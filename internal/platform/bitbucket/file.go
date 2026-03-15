@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // GetFileContent retrieves the raw content of a file at a specific commit from

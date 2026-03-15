@@ -46,6 +46,7 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(newSnippetCmd())
 	cmd.AddCommand(newCommentsCmd())
 	cmd.AddCommand(newApplyCmd())
+	cmd.AddCommand(newServeCmd())
 
 	return cmd
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // DedupeFindings compares new findings against existing bot comments and returns

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // severityIcons maps severity levels to colored circle emoji.

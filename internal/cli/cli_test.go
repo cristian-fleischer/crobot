@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/config"
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/platform/bitbucket"
-	"github.com/dizzyc/crobot/internal/review"
+	"github.com/cristian-fleischer/crobot/internal/config"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform/bitbucket"
+	"github.com/cristian-fleischer/crobot/internal/review"
 )
 
 // testServer creates a mock Bitbucket API server with preset responses and
@@ -292,7 +292,7 @@ func TestSnippet_Success(t *testing.T) {
 		t.Errorf("snippet does not contain context line 7: %q", snippet)
 	}
 
-	out := snippetOutput{
+	out := platform.SnippetOutput{
 		Path:      "main.go",
 		Commit:    "abc123",
 		StartLine: startLine,

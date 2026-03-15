@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // bbComment is the Bitbucket API representation of a pull request comment.

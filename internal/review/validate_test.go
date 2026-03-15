@@ -3,8 +3,8 @@ package review_test
 import (
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/review"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/review"
 )
 
 // testPRContext returns a PRContext with two changed files and multiple hunks

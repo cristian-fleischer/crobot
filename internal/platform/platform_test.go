@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // ---------------------------------------------------------------------------

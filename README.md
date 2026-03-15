@@ -17,6 +17,8 @@ developer's machine and in CI pipelines.
 - **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs.
 - **Diff-aware validation**: Only allows comments on lines actually changed in
   the PR.
+- **MCP server**: Expose all tools over the Model Context Protocol (MCP) for
+  direct agent integration via stdio.
 - **Single binary**: No runtime dependencies.
 
 ## Installation
@@ -24,18 +26,18 @@ developer's machine and in CI pipelines.
 ### From Source
 
 ```bash
-go install github.com/dizzyc/crobot/cmd/crobot@latest
+go install github.com/cristian-fleischer/crobot/cmd/crobot@latest
 ```
 
 ### From Releases
 
 Download the binary for your platform from the
-[Releases](https://github.com/dizzyc/crobot/releases) page.
+[Releases](https://github.com/cristian-fleischer/crobot/releases) page.
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/dizzyc/crobot.git
+git clone https://github.com/cristian-fleischer/crobot.git
 cd crobot
 go build -o crobot ./cmd/crobot
 ```
@@ -250,6 +252,23 @@ cat findings.json | crobot apply-review-findings \
 
 *Required unless set in config file or env vars.
 
+### `serve`
+
+Starts CRoBot as an MCP (Model Context Protocol) server over stdio. This
+allows MCP-capable agents like Claude Code to call CRoBot tools directly
+without shelling out to CLI commands.
+
+```bash
+crobot serve --mcp
+```
+
+| Flag    | Type | Required | Default | Description                          |
+|---------|------|----------|---------|--------------------------------------|
+| `--mcp` | bool | yes      | `false` | Start as MCP server over stdio       |
+
+The server exposes the same four tools as the [CLI](#commands): `export_pr_context`,
+`get_file_snippet`, `list_bot_comments`, and `apply_review_findings`.
+
 ### Global Flags
 
 | Flag              | Type   | Default | Description                          |
@@ -463,7 +482,43 @@ export CROBOT_BITBUCKET_REPO="$REPO"
 
 ## Agent Integration
 
-CRoBot includes instruction files for popular AI coding agents:
+### MCP Server (Recommended)
+
+MCP-capable agents (e.g. Claude Code) can use CRoBot as a native tool server.
+Add a `.mcp.json` to your project root:
+
+```json
+{
+  "mcpServers": {
+    "crobot": {
+      "command": "crobot",
+      "args": ["serve", "--mcp"],
+      "env": {
+        "CROBOT_PLATFORM": "bitbucket",
+        "CROBOT_BITBUCKET_USER": "your-username",
+        "CROBOT_BITBUCKET_TOKEN": "your-app-password",
+        "CROBOT_BITBUCKET_WORKSPACE": "your-workspace",
+        "CROBOT_BITBUCKET_REPO": "your-repo"
+      }
+    }
+  }
+}
+```
+
+The agent then has direct access to the following tools:
+
+- **`export_pr_context`** -- Fetch PR metadata, changed files, and diff hunks.
+- **`get_file_snippet`** -- Retrieve a slice of a file at a specific commit with surrounding context.
+- **`list_bot_comments`** -- List existing CRoBot comments on a PR.
+- **`apply_review_findings`** -- Validate, deduplicate, and post review findings as inline PR comments.
+
+No shell commands needed. The `apply_review_findings` tool defaults to dry-run
+mode and is annotated as destructive, so agents will ask for confirmation
+before posting.
+
+### Instruction Files
+
+CRoBot also includes instruction files for agents that don't support MCP:
 
 | Agent               | Instruction File            |
 |---------------------|-----------------------------|

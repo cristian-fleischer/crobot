@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 func TestGetPRContext_HappyPath(t *testing.T) {

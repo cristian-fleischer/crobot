@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "crobot": {
+      "command": "crobot",
+      "args": ["serve", "--mcp"],
+      "env": {
+        "CROBOT_PLATFORM": "bitbucket",
+        "CROBOT_BITBUCKET_USER": "your-username",
+        "CROBOT_BITBUCKET_TOKEN": "your-app-password",
+        "CROBOT_BITBUCKET_WORKSPACE": "your-workspace",
+        "CROBOT_BITBUCKET_REPO": "your-repo"
+      }
+    }
+  }
+}

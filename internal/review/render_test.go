@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/review"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/review"
 )
 
 func TestRenderComment(t *testing.T) {

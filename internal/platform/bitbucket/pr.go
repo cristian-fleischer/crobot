@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
 // bbPR is the Bitbucket API representation of a pull request.

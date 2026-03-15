@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dizzyc/crobot/internal/platform"
-	"github.com/dizzyc/crobot/internal/platform/bitbucket"
-	"github.com/dizzyc/crobot/internal/review"
+	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/platform/bitbucket"
+	"github.com/cristian-fleischer/crobot/internal/review"
 )
 
 // TestEndToEnd_ExportThenDryRunApply exercises the full CLI workflow:

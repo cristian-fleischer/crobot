@@ -15,7 +15,7 @@
 
 ### P1.1 Project Scaffolding
 
-- [x] P1.1.1 Initialize Go module (`go mod init github.com/dizzyc/crobot`)
+- [x] P1.1.1 Initialize Go module (`go mod init github.com/cristian-fleischer/crobot`)
 - [x] P1.1.2 Create project directory structure (`cmd/crobot/`, `internal/`)
 - [x] P1.1.3 Add cobra dependency, create root command skeleton (`internal/cli/root.go`)
 - [x] P1.1.4 Add global flags: `--version`, `--help`, `--verbose`, `--output-format`
@@ -166,25 +166,25 @@
 
 ### P2.1 MCP Server Core
 
-- [ ] P2.1.1 Set up MCP server skeleton (`internal/mcp/server.go`)
-  - [ ] stdio transport (JSON-RPC 2.0 over stdin/stdout)
-  - [ ] Server capability negotiation
-- [ ] P2.1.2 Define MCP tool schemas (`internal/mcp/tools.go`)
-  - [ ] `export_pr_context` tool definition
-  - [ ] `get_file_snippet` tool definition
-  - [ ] `list_bot_comments` tool definition
-  - [ ] `apply_review_findings` tool definition
-- [ ] P2.1.3 Implement tool call handler (`internal/mcp/handler.go`)
-  - [ ] Route MCP tool calls to existing internal functions
-  - [ ] Error mapping (internal errors -> MCP error responses)
+- [x] P2.1.1 Set up MCP server skeleton (`internal/mcp/server.go`)
+  - [x] stdio transport (JSON-RPC 2.0 over stdin/stdout)
+  - [x] Server capability negotiation
+- [x] P2.1.2 Define MCP tool schemas (`internal/mcp/tools.go`)
+  - [x] `export_pr_context` tool definition
+  - [x] `get_file_snippet` tool definition
+  - [x] `list_bot_comments` tool definition
+  - [x] `apply_review_findings` tool definition
+- [x] P2.1.3 Implement tool call handler (`internal/mcp/handler.go`)
+  - [x] Route MCP tool calls to existing internal functions
+  - [x] Error mapping (internal errors -> MCP error responses)
 
 ### P2.2 CLI Integration
 
-- [ ] P2.2.1 Add `serve` command (`internal/cli/serve.go`)
-  - [ ] `crobot serve --mcp` starts the MCP server
-  - [ ] Wire config (platform credentials, review settings)
-- [ ] P2.2.2 Create example `.mcp.json` config for Claude Code
-- [ ] P2.2.3 Integration test: MCP tool call round-trip
+- [x] P2.2.1 Add `serve` command (`internal/cli/serve.go`)
+  - [x] `crobot serve --mcp` starts the MCP server
+  - [x] Wire config (platform credentials, review settings)
+- [x] P2.2.2 Create example `.mcp.json` config for Claude Code
+- [x] P2.2.3 Integration test: MCP tool call round-trip
 
 ---
 

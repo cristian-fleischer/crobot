@@ -5,21 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
-	"github.com/dizzyc/crobot/internal/config"
-	"github.com/dizzyc/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/config"
+	"github.com/cristian-fleischer/crobot/internal/platform"
 	"github.com/spf13/cobra"
 )
-
-// snippetOutput is the JSON output for the get-file-snippet command.
-type snippetOutput struct {
-	Path      string `json:"path"`
-	Commit    string `json:"commit"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
-	Content   string `json:"content"`
-}
 
 // newSnippetCmd creates the get-file-snippet subcommand.
 func newSnippetCmd() *cobra.Command {
@@ -76,37 +66,9 @@ func newSnippetCmd() *cobra.Command {
 				return fmt.Errorf("fetching file content: %w", err)
 			}
 
-			// Extract the snippet around the specified line.
-			lines := strings.Split(string(content), "\n")
-			// Trim trailing empty element from final newline.
-			if len(lines) > 0 && lines[len(lines)-1] == "" {
-				lines = lines[:len(lines)-1]
-			}
-			if len(lines) == 0 {
-				return fmt.Errorf("file %q is empty", path)
-			}
-			if line > len(lines) {
-				return fmt.Errorf("line %d is out of range (file has %d lines)", line, len(lines))
-			}
-
-			startLine := line - contextSize
-			if startLine < 1 {
-				startLine = 1
-			}
-			endLine := line + contextSize
-			if endLine > len(lines) {
-				endLine = len(lines)
-			}
-
-			// Convert to 0-based indices for slicing.
-			snippet := strings.Join(lines[startLine-1:endLine], "\n")
-
-			out := snippetOutput{
-				Path:      path,
-				Commit:    commit,
-				StartLine: startLine,
-				EndLine:   endLine,
-				Content:   snippet,
+			out, err := platform.ExtractSnippet(content, path, commit, line, contextSize)
+			if err != nil {
+				return err
 			}
 
 			data, err := json.MarshalIndent(out, "", "  ")

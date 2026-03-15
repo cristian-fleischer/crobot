@@ -12,6 +12,7 @@ import (
 
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/prompt"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -27,7 +28,7 @@ func NewServer(plat platform.Platform, cfg config.Config) (*Server, error) {
 		"crobot",
 		"1.0.0",
 		server.WithToolCapabilities(false),
-		server.WithInstructions("CRoBot - AI-powered code review bot. Use these tools to export PR context, get file snippets, list bot comments, and apply review findings."),
+		server.WithInstructions(prompt.MCPInstructions()),
 	)
 
 	// Register tools.

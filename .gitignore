@@ -1,5 +1,5 @@
-# Compiled binary
-crobot
+# Compiled binary (root only, not cmd/crobot/)
+/crobot
 
 # Sensitive config and output files
 .crobot.yaml

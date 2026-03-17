@@ -1,3 +1,5 @@
+// Package platform defines the abstractions and shared types for interacting
+// with code-hosting platforms (Bitbucket, GitHub, GitLab, etc.).
 package platform
 
 import "context"

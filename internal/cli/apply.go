@@ -65,7 +65,12 @@ Use --write to actually post comments.`,
 			if input == "-" {
 				findingsData, err = io.ReadAll(io.LimitReader(os.Stdin, maxInputSize))
 			} else {
-				findingsData, err = os.ReadFile(input)
+				f, openErr := os.Open(input)
+				if openErr != nil {
+					return fmt.Errorf("reading input: %w", openErr)
+				}
+				defer f.Close()
+				findingsData, err = io.ReadAll(io.LimitReader(f, maxInputSize))
 			}
 			if err != nil {
 				return fmt.Errorf("reading input: %w", err)

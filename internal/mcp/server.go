@@ -13,6 +13,7 @@ import (
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
 	"github.com/cristian-fleischer/crobot/internal/prompt"
+	"github.com/cristian-fleischer/crobot/internal/version"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -26,7 +27,7 @@ type Server struct {
 func NewServer(plat platform.Platform, cfg config.Config) (*Server, error) {
 	mcpSrv := server.NewMCPServer(
 		"crobot",
-		"1.0.0",
+		version.Version,
 		server.WithToolCapabilities(false),
 		server.WithInstructions(prompt.MCPInstructions()),
 	)

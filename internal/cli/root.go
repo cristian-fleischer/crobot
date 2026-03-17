@@ -7,16 +7,13 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/cristian-fleischer/crobot/internal/version"
 	"github.com/spf13/cobra"
 )
-
-// version is set at build time via ldflags.
-var version = "dev"
 
 // RootCmd returns the root cobra command for crobot.
 func RootCmd() *cobra.Command {
 	var verbose bool
-	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:   "crobot",
@@ -38,8 +35,7 @@ func RootCmd() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose/debug logging")
-	cmd.PersistentFlags().StringVar(&outputFormat, "output-format", "json", "Output format (json)")
-	cmd.Version = version
+	cmd.Version = version.Version
 
 	// Register subcommands.
 	cmd.AddCommand(newExportCmd())
@@ -48,6 +44,8 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(newApplyCmd())
 	cmd.AddCommand(newServeCmd())
 	cmd.AddCommand(newInstructionsCmd())
+	cmd.AddCommand(newReviewCmd())
+	cmd.AddCommand(newModelsCmd())
 
 	return cmd
 }

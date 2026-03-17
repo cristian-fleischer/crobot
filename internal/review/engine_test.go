@@ -121,6 +121,9 @@ func TestEngine_DryRun(t *testing.T) {
 		if p.CommentID != "dry-run" {
 			t.Errorf("expected comment ID 'dry-run', got %q", p.CommentID)
 		}
+		if p.RenderedBody == "" {
+			t.Errorf("expected RenderedBody to be populated in dry-run, got empty for %s:%d", p.Finding.Path, p.Finding.Line)
+		}
 	}
 }
 
@@ -150,6 +153,11 @@ func TestEngine_WriteMode(t *testing.T) {
 	}
 	if result.Summary.Total != 2 {
 		t.Errorf("expected total 2, got %d", result.Summary.Total)
+	}
+	for _, p := range result.Posted {
+		if p.RenderedBody == "" {
+			t.Errorf("expected RenderedBody to be populated in write mode, got empty for %s:%d", p.Finding.Path, p.Finding.Line)
+		}
 	}
 }
 

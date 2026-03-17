@@ -472,6 +472,21 @@ func TestEnvVarParsing(t *testing.T) {
 		}
 	})
 
+	t.Run("model from env", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"CROBOT_MODEL": "gemini-2.5-pro",
+		}
+		cfg, err := Load("", "", envMap(env))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.Agent.Model != "gemini-2.5-pro" {
+			t.Errorf("Agent.Model = %q, want %q", cfg.Agent.Model, "gemini-2.5-pro")
+		}
+	})
+
 	t.Run("API keys from env", func(t *testing.T) {
 		t.Parallel()
 
@@ -510,5 +525,79 @@ func TestLoadNilEnvLookup(t *testing.T) {
 	// Should get pure defaults without panic.
 	if cfg.Platform != "bitbucket" {
 		t.Errorf("Platform = %q, want %q", cfg.Platform, "bitbucket")
+	}
+}
+
+// TestParseBool_Unrecognized verifies that unrecognized boolean strings log a
+// warning and return false (NH-8).
+func TestParseBool_Unrecognized(t *testing.T) {
+	t.Parallel()
+
+	// These values are not in the recognized set; parseBool should return false
+	// (and emit a slog.Warn — we just verify the return value here).
+	unrecognizedValues := []string{
+		"yess",
+		"noo",
+		"tru",
+		"fals",
+		"on",
+		"off",
+		"enabled",
+		"disabled",
+		"2",
+		"-1",
+	}
+
+	for _, v := range unrecognizedValues {
+		t.Run(v, func(t *testing.T) {
+			t.Parallel()
+
+			got := parseBool(v)
+			if got != false {
+				t.Errorf("parseBool(%q) = %v, want false for unrecognized value", v, got)
+			}
+		})
+	}
+}
+
+// TestParseBool_Recognized verifies all the officially recognized values.
+func TestParseBool_Recognized(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		// truthy
+		{"true", true},
+		{"True", true},
+		{"TRUE", true},
+		{"1", true},
+		{"yes", true},
+		{"Yes", true},
+		{"YES", true},
+		// falsy (explicit)
+		{"false", false},
+		{"False", false},
+		{"FALSE", false},
+		{"0", false},
+		{"no", false},
+		{"No", false},
+		{"NO", false},
+		{"", false},
+		// whitespace trimming
+		{"  true  ", true},
+		{"  false  ", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := parseBool(tt.input)
+			if got != tt.want {
+				t.Errorf("parseBool(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
 	}
 }

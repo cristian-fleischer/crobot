@@ -46,6 +46,12 @@ func (h *handler) dispatch(name string) func(ctx context.Context, req mcp.CallTo
 	}
 }
 
+// toolError logs the detailed error and returns a sanitized message to the MCP agent.
+func toolError(msg string, err error) *mcp.CallToolResult {
+	slog.Debug(msg, "error", err)
+	return mcp.NewToolResultError(msg)
+}
+
 // handleExportPRContext fetches and returns the full PR context as JSON.
 func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	workspace := mcp.ParseString(req, "workspace", "")
@@ -62,7 +68,7 @@ func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolReq
 		PRNumber:  pr,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("fetching PR context: %v", err)), nil
+		return toolError("failed to fetch PR context", err), nil
 	}
 
 	data, err := json.MarshalIndent(prCtx, "", "  ")
@@ -96,12 +102,12 @@ func (h *handler) handleGetFileSnippet(ctx context.Context, req mcp.CallToolRequ
 		Path:      path,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("fetching file content: %v", err)), nil
+		return toolError("failed to fetch file content", err), nil
 	}
 
 	out, err := platform.ExtractSnippet(content, path, commit, line, contextSize)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return toolError("failed to extract snippet", err), nil
 	}
 
 	data, err := json.MarshalIndent(out, "", "  ")
@@ -128,7 +134,7 @@ func (h *handler) handleListBotComments(ctx context.Context, req mcp.CallToolReq
 		PRNumber:  pr,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("listing bot comments: %v", err)), nil
+		return toolError("failed to list bot comments", err), nil
 	}
 
 	data, err := json.MarshalIndent(comments, "", "  ")
@@ -161,12 +167,12 @@ func (h *handler) handleApplyReviewFindings(ctx context.Context, req mcp.CallToo
 	// and there is no way to type-assert directly to []platform.ReviewFinding.
 	findingsJSON, err := json.Marshal(findingsRaw)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("marshaling findings: %v", err)), nil
+		return toolError("failed to parse findings input", err), nil
 	}
 
 	findings, err := platform.ParseFindings(findingsJSON)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("parsing findings: %v", err)), nil
+		return toolError("failed to parse findings", err), nil
 	}
 
 	// Determine max comments: tool arg > config default.
@@ -188,7 +194,7 @@ func (h *handler) handleApplyReviewFindings(ctx context.Context, req mcp.CallToo
 		PRNumber:  pr,
 	}, findings)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("running review engine: %v", err)), nil
+		return toolError("failed to run review engine", err), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")

@@ -1,2 +1,11 @@
 # Compiled binary
 crobot
+
+# Sensitive config and output files
+.crobot.yaml
+findings.json
+*.env
+mockagent
+
+# Claude Code local settings (may contain permissions/paths)
+.claude/settings.local.json

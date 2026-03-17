@@ -3,13 +3,14 @@ package platform
 import (
 	"fmt"
 	"sync"
+
+	"github.com/cristian-fleischer/crobot/internal/config"
 )
 
-// Constructor is a function that creates a Platform from an opaque
-// configuration value. Each platform implementation defines its own expected
-// config type (e.g. bitbucket expects *bitbucket.Config); the factory caller
-// is responsible for passing the correct type.
-type Constructor func(cfg any) (Platform, error)
+// Constructor is a function that creates a Platform from the application
+// configuration. Each platform implementation extracts its own settings from
+// the Config (e.g. bitbucket reads cfg.Bitbucket).
+type Constructor func(cfg config.Config) (Platform, error)
 
 var (
 	registryMu sync.RWMutex
@@ -30,7 +31,7 @@ func Register(name string, ctor Constructor) {
 // forwarded to the constructor registered for that name. Returns
 // ErrUnknownPlatform (wrapped) if no constructor is registered for the given
 // name.
-func NewPlatform(name string, cfg any) (Platform, error) {
+func NewPlatform(name string, cfg config.Config) (Platform, error) {
 	registryMu.RLock()
 	ctor, ok := registry[name]
 	registryMu.RUnlock()

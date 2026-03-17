@@ -5,7 +5,8 @@ crobot
 .crobot.yaml
 findings.json
 *.env
-mockagent
+# Compiled mock agent binary (but not the source in testdata/)
+/mockagent
 
 # Claude Code local settings (may contain permissions/paths)
 .claude/settings.local.json

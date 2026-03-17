@@ -169,8 +169,8 @@ func TestHandleExportPRContext_PlatformError(t *testing.T) {
 		t.Error("expected error result for platform failure")
 	}
 	text := resultText(t, result)
-	if !strings.Contains(text, "rate limited") {
-		t.Errorf("error result should contain cause: %s", text)
+	if !strings.Contains(text, "failed to fetch PR context") {
+		t.Errorf("error result should contain sanitized message: %s", text)
 	}
 }
 
@@ -299,8 +299,8 @@ func TestHandleGetFileSnippet_LineOutOfRange(t *testing.T) {
 		t.Error("expected error for out-of-range line")
 	}
 	text := resultText(t, result)
-	if !strings.Contains(text, "out of range") {
-		t.Errorf("error should mention out of range: %s", text)
+	if !strings.Contains(text, "failed to extract snippet") {
+		t.Errorf("error should contain sanitized message: %s", text)
 	}
 }
 
@@ -589,8 +589,8 @@ func TestHandleGetFileSnippet_PlatformError(t *testing.T) {
 		t.Error("expected error result for platform failure")
 	}
 	text := resultText(t, result)
-	if !strings.Contains(text, "file not found") {
-		t.Errorf("error should contain cause: %s", text)
+	if !strings.Contains(text, "failed to fetch file content") {
+		t.Errorf("error should contain sanitized message: %s", text)
 	}
 }
 
@@ -614,8 +614,8 @@ func TestHandleListBotComments_PlatformError(t *testing.T) {
 		t.Error("expected error result for platform failure")
 	}
 	text := resultText(t, result)
-	if !strings.Contains(text, "unauthorized") {
-		t.Errorf("error should contain cause: %s", text)
+	if !strings.Contains(text, "failed to list bot comments") {
+		t.Errorf("error should contain sanitized message: %s", text)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -69,6 +70,9 @@ type ReviewConfig struct {
 type AgentConfig struct {
 	// Default is the name of the default agent to use.
 	Default string `yaml:"default"`
+
+	// Model is the default model ID to request from the agent.
+	Model string `yaml:"model"`
 
 	// Agents maps agent names to their definitions.
 	Agents map[string]AgentDef `yaml:"agents"`
@@ -215,6 +219,9 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 	if v, ok := lookupEnv("CROBOT_AGENT"); ok {
 		cfg.Agent.Default = v
 	}
+	if v, ok := lookupEnv("CROBOT_MODEL"); ok {
+		cfg.Agent.Model = v
+	}
 
 	// Phase 4 env vars.
 	if v, ok := lookupEnv("CROBOT_AI_PROVIDER"); ok {
@@ -246,7 +253,10 @@ func parseBool(s string) bool {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "true", "1", "yes":
 		return true
+	case "false", "0", "no", "":
+		return false
 	default:
+		slog.Warn("unrecognized boolean value", "value", s)
 		return false
 	}
 }

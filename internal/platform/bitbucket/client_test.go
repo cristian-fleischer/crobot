@@ -304,6 +304,27 @@ func TestTruncateBody(t *testing.T) {
 	}
 }
 
+func TestDoURL_HostMismatch(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("request should not have been sent")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	c := testClient(t, server)
+
+	// Attempt to follow a pagination URL pointing at a different host.
+	_, err := c.doURL(context.Background(), "https://evil.example.com/steal-creds")
+	if err == nil {
+		t.Fatal("expected error for host mismatch")
+	}
+	if !strings.Contains(err.Error(), "does not match") {
+		t.Errorf("expected host mismatch error, got: %v", err)
+	}
+}
+
 // testClient creates a Client pointing at the given test server.
 func testClient(t *testing.T, server *httptest.Server) *Client {
 	t.Helper()

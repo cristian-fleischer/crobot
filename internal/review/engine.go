@@ -39,8 +39,9 @@ type ReviewResult struct {
 
 // PostedComment records a finding that was successfully posted as a comment.
 type PostedComment struct {
-	Finding   platform.ReviewFinding `json:"finding"`
-	CommentID string                 `json:"comment_id"`
+	Finding      platform.ReviewFinding `json:"finding"`
+	CommentID    string                 `json:"comment_id"`
+	RenderedBody string                 `json:"rendered_body"`
 }
 
 // SkippedComment records a finding that was not posted, along with the reason.
@@ -84,16 +85,21 @@ func NewEngine(p platform.Platform, cfg EngineConfig) *Engine {
 //  8. If write: post each comment, track results
 //  9. Return ReviewResult with counts
 func (e *Engine) Run(ctx context.Context, req platform.PRRequest, findings []platform.ReviewFinding) (*ReviewResult, error) {
-	result := &ReviewResult{}
-	result.Summary.Total = len(findings)
-
-	// 1. Fetch PR context.
+	// Fetch PR context, then delegate to RunWithContext.
 	prCtx, err := e.platform.GetPRContext(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching PR context: %w", err)
 	}
+	return e.RunWithContext(ctx, req, prCtx, findings)
+}
 
-	// 2. Validate findings against PR context.
+// RunWithContext executes the review pipeline using a pre-fetched PRContext.
+// This avoids a redundant API call when the caller already has the context.
+func (e *Engine) RunWithContext(ctx context.Context, req platform.PRRequest, prCtx *platform.PRContext, findings []platform.ReviewFinding) (*ReviewResult, error) {
+	result := &ReviewResult{}
+	result.Summary.Total = len(findings)
+
+	// 1. Validate findings against PR context.
 	validated, rejected := ValidateFindings(findings, prCtx, e.config.SeverityThreshold)
 	for _, r := range rejected {
 		result.Skipped = append(result.Skipped, SkippedComment{
@@ -137,8 +143,9 @@ func (e *Engine) Run(ctx context.Context, req platform.PRRequest, findings []pla
 
 		if e.config.DryRun {
 			result.Posted = append(result.Posted, PostedComment{
-				Finding:   f,
-				CommentID: "dry-run",
+				Finding:      f,
+				CommentID:    "dry-run",
+				RenderedBody: body,
 			})
 			continue
 		}
@@ -167,8 +174,9 @@ func (e *Engine) Run(ctx context.Context, req platform.PRRequest, findings []pla
 		}
 
 		result.Posted = append(result.Posted, PostedComment{
-			Finding:   f,
-			CommentID: posted.ID,
+			Finding:      f,
+			CommentID:    posted.ID,
+			RenderedBody: body,
 		})
 	}
 

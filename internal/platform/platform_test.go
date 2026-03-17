@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
 )
 
@@ -422,7 +423,7 @@ func TestParseFindings(t *testing.T) {
 func TestNewPlatform_UnknownPlatform(t *testing.T) {
 	t.Parallel()
 
-	_, err := platform.NewPlatform("nosuchplatform", nil)
+	_, err := platform.NewPlatform("nosuchplatform", config.Config{})
 	if err == nil {
 		t.Fatal("expected error for unknown platform, got nil")
 	}
@@ -435,11 +436,11 @@ func TestNewPlatform_RegisteredPlatform(t *testing.T) {
 	t.Parallel()
 
 	// Register a stub platform for the test.
-	platform.Register("stub", func(cfg any) (platform.Platform, error) {
+	platform.Register("stub", func(cfg config.Config) (platform.Platform, error) {
 		return stubPlatform{}, nil
 	})
 
-	p, err := platform.NewPlatform("stub", nil)
+	p, err := platform.NewPlatform("stub", config.Config{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/cristian-fleischer/crobot/internal/platform"
@@ -44,13 +45,10 @@ type bbInlinePayload struct {
 // ListBotComments retrieves all comments on a pull request that contain a
 // CRoBot fingerprint marker, indicating they were posted by this bot.
 func (c *Client) ListBotComments(ctx context.Context, opts platform.PRRequest) ([]platform.Comment, error) {
-	workspace := opts.Workspace
-	if workspace == "" {
-		workspace = c.workspace
-	}
+	workspace := c.resolveWorkspace(opts.Workspace)
 
 	basePath := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d/comments",
-		workspace, opts.Repo, opts.PRNumber)
+		url.PathEscape(workspace), url.PathEscape(opts.Repo), opts.PRNumber)
 
 	var botComments []platform.Comment
 
@@ -112,13 +110,10 @@ func (c *Client) ListBotComments(ctx context.Context, opts platform.PRRequest) (
 
 // CreateInlineComment posts a single inline comment on a pull request.
 func (c *Client) CreateInlineComment(ctx context.Context, opts platform.PRRequest, comment platform.InlineComment) (*platform.Comment, error) {
-	workspace := opts.Workspace
-	if workspace == "" {
-		workspace = c.workspace
-	}
+	workspace := c.resolveWorkspace(opts.Workspace)
 
 	basePath := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d/comments",
-		workspace, opts.Repo, opts.PRNumber)
+		url.PathEscape(workspace), url.PathEscape(opts.Repo), opts.PRNumber)
 
 	payload := bbCommentCreatePayload{}
 	payload.Content.Raw = comment.Body
@@ -170,13 +165,10 @@ func (c *Client) CreateInlineComment(ctx context.Context, opts platform.PRReques
 
 // DeleteComment removes a previously posted comment from a pull request.
 func (c *Client) DeleteComment(ctx context.Context, opts platform.PRRequest, commentID string) error {
-	workspace := opts.Workspace
-	if workspace == "" {
-		workspace = c.workspace
-	}
+	workspace := c.resolveWorkspace(opts.Workspace)
 
 	path := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d/comments/%s",
-		workspace, opts.Repo, opts.PRNumber, commentID)
+		url.PathEscape(workspace), url.PathEscape(opts.Repo), opts.PRNumber, url.PathEscape(commentID))
 
 	_, err := c.do(ctx, "DELETE", path, nil)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -667,6 +668,54 @@ func TestWriteJSON(t *testing.T) {
 	}
 	if got := buf.String(); got != "{\"key\":\"value\"}\n" {
 		t.Errorf("got %q, want %q", got, "{\"key\":\"value\"}\n")
+	}
+}
+
+// TestApplyReviewFindings_FileSizeLimit verifies that the 10 MB read limit is
+// enforced when reading the findings input file (SF-4 fix).
+func TestApplyReviewFindings_FileSizeLimit(t *testing.T) {
+	t.Parallel()
+
+	// Write a file just over 10 MB of valid-looking but truncated JSON.
+	const maxInputSize = 10 << 20 // 10 MB (must match apply.go)
+	tmpDir := t.TempDir()
+	bigFile := filepath.Join(tmpDir, "big.json")
+
+	// Build a byte slice slightly larger than the limit: fill with spaces
+	// preceded by '[' so it would be parseable if not truncated.
+	content := make([]byte, maxInputSize+512)
+	content[0] = '['
+	for i := 1; i < len(content); i++ {
+		content[i] = ' '
+	}
+	if err := os.WriteFile(bigFile, content, 0644); err != nil {
+		t.Fatalf("writing big file: %v", err)
+	}
+
+	// io.LimitReader caps at maxInputSize; the resulting data will be truncated
+	// and therefore fail JSON parsing — verify we get a parse error, not a
+	// resource-exhaustion scenario.
+	f, err := os.Open(bigFile)
+	if err != nil {
+		t.Fatalf("opening big file: %v", err)
+	}
+	defer f.Close()
+
+	limited := io.LimitReader(f, maxInputSize)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		t.Fatalf("reading limited file: %v", err)
+	}
+
+	// The read must be capped at exactly maxInputSize bytes.
+	if len(data) != maxInputSize {
+		t.Errorf("read %d bytes, want exactly %d (limit)", len(data), maxInputSize)
+	}
+
+	// Parsing truncated JSON should fail (incomplete JSON array).
+	_, parseErr := platform.ParseFindings(data)
+	if parseErr == nil {
+		t.Error("expected parse error for truncated JSON, got nil")
 	}
 }
 

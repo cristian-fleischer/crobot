@@ -7,16 +7,39 @@ AI-generated review findings against the actual diff, deduplicates against
 existing comments, and posts inline review comments. The same binary works on a
 developer's machine and in CI pipelines.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Setting Up Bitbucket Authentication](#setting-up-bitbucket-authentication)
+- [Quickstart](#quickstart)
+- [Commands](#commands)
+  - [`models`](#models)
+- [ReviewFinding Schema](#reviewfinding-schema)
+- [Configuration](#configuration)
+- [CI/CD Integration](#cicd-integration)
+- [Agent Integration](#agent-integration)
+- [Development](#development)
+- [License](#license)
+
 ## Features
 
 - **Platform-agnostic**: Bitbucket Cloud supported today; GitHub and GitLab
   planned.
 - **Agent-agnostic**: Works with any AI coding agent (Claude Code, Codex CLI,
   OpenCode, Copilot) or directly via AI provider APIs (planned).
+- **One-command review**: `crobot review https://bitbucket.org/team/repo/pull-requests/42`
+  spawns an ACP-compatible agent, feeds it the PR diff, and posts inline
+  comments -- fully automated.
 - **Safe by default**: Dry-run mode is the default. Use `--write` to post.
 - **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs.
 - **Diff-aware validation**: Only allows comments on lines actually changed in
   the PR.
+- **ACP orchestrator**: Spawns and manages any ACP-compatible agent subprocess
+  (Claude, Codex, Gemini, OpenCode) to perform end-to-end reviews.
+- **Formatted streaming output**: Agent output is rendered as formatted
+  markdown in the terminal with a live progress indicator showing elapsed time,
+  prompt/response sizes, and current agent activity.
 - **MCP server**: Expose all tools over the Model Context Protocol (MCP) for
   direct agent integration via stdio.
 - **Single binary**: No runtime dependencies.
@@ -107,13 +130,13 @@ platform: bitbucket
 bitbucket:
   workspace: myteam
   repo: my-service
-  user: you@example.com
-  token: your-api-token
+  # Credentials (user/token) cannot be set in config files.
+  # Use environment variables: CROBOT_BITBUCKET_USER, CROBOT_BITBUCKET_TOKEN
 ```
 
-> **Security note:** If you store the token in a config file, ensure the file
-> has restricted permissions (`chmod 600 ~/.config/crobot/config.yaml`). For
-> CI environments, always use environment variables or a secrets manager.
+> **Security note:** Credentials must be provided via environment variables
+> (`CROBOT_BITBUCKET_USER`, `CROBOT_BITBUCKET_TOKEN`). They cannot be loaded
+> from config files. For CI environments, use a secrets manager.
 
 ---
 
@@ -123,6 +146,50 @@ bitbucket:
 
 Follow the [Bitbucket Authentication](#setting-up-bitbucket-authentication)
 steps above, then either export env vars or create a config file.
+
+### Option A: One-Command Review (Recommended)
+
+Use `crobot review` to run an end-to-end AI-powered review with a single
+command. CRoBot spawns an ACP-compatible agent, feeds it the PR diff, collects
+findings, and posts inline comments.
+
+The PR can be specified as a positional argument or via `--pr`. When a URL is
+provided, the workspace, repo, and PR number are extracted automatically:
+
+```bash
+# Using a PR URL as a positional argument (simplest)
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
+
+# Using a PR number (requires workspace/repo from config or flags)
+crobot review 42
+
+# Post comments with live agent output (markdown formatted)
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --write --show-agent-output
+
+# Raw unformatted agent output
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --show-agent-output --raw
+
+# --pr flag also works
+crobot review --pr 42
+
+# Choose a specific model
+crobot review 42 --agent-command "gemini --experimental-acp" --model gemini-2.5-pro
+
+# Interactive model selection
+crobot review 42 --model ask
+
+# Zero-config: specify the agent binary directly (no config file needed)
+CROBOT_BITBUCKET_USER="you@example.com" CROBOT_BITBUCKET_TOKEN="your-token" \
+  crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --agent-command claude-agent-acp
+```
+
+The agent can be configured in your config file (see [Configuration](#configuration))
+or specified directly with `--agent-command` for zero-config usage.
+
+### Option B: Manual Workflow
+
+For more control, use the individual CLI commands to export context, generate
+findings with your own AI agent, and apply them.
 
 ### 2. Export PR Context
 
@@ -252,6 +319,88 @@ cat findings.json | crobot apply-review-findings \
 
 *Required unless set in config file or env vars.
 
+### `review`
+
+Runs an end-to-end AI-powered code review on a pull request. CRoBot spawns an
+ACP-compatible agent subprocess, sends it the PR diff with review instructions,
+collects the agent's findings, validates them against the diff, deduplicates
+against existing comments, and posts inline review comments.
+
+```bash
+# Using a PR URL (simplest — workspace and repo deduced from the URL)
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
+
+# Using a PR number (requires workspace/repo from config or flags)
+crobot review 42
+crobot review --workspace <ws> --repo <repo> 42
+
+# With a specific agent from config
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --agent claude
+
+# Post comments with formatted live agent output
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --write --show-agent-output
+
+# Raw unformatted output (disable markdown rendering)
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --show-agent-output --raw
+
+# Steer the review with additional instructions
+crobot review 42 -i "focus on security issues and SQL injection"
+
+# Use an agent command directly (no config file needed)
+crobot review 42 --agent-command "gemini --experimental-acp"
+
+# Limit comments
+crobot review 42 --write --max-comments 10
+
+# --pr flag also works (equivalent to positional arg)
+crobot review --pr 42
+```
+
+The PR reference (URL or number) can be passed as a positional argument or via
+`--pr`. If both are provided, an error is returned.
+
+| Flag                  | Type   | Required | Default | Description                                              |
+|-----------------------|--------|----------|---------|----------------------------------------------------------|
+| (positional)          | string | no*      |         | PR number or URL as the first positional argument        |
+| `--pr`                | string | no*      |         | PR number or URL (alternative to positional argument)    |
+| `--workspace`         | string | no**     |         | Workspace/organization slug                              |
+| `--repo`              | string | no**     |         | Repository slug                                          |
+| `--agent`             | string | no       | config  | ACP agent name (from `agent.agents` in config)           |
+| `--agent-command`     | string | no       |         | ACP agent command with args, e.g. `"gemini --experimental-acp"` |
+| `-m`, `--model`       | string | no       | config  | Model ID to use, or `"ask"` for interactive selection    |
+| `--dry-run`           | bool   | no       | `true`  | Validate without posting (default behavior)              |
+| `--write`             | bool   | no       | `false` | Actually post comments to the PR                         |
+| `--max-comments`      | int    | no       | config  | Max comments to post (`0` = unlimited)                   |
+| `--show-agent-output` | bool   | no       | `false` | Stream formatted agent output with progress indicator    |
+| `--raw`               | bool   | no       | `false` | Disable markdown formatting and progress indicator       |
+| `-i`, `--instructions`| string | no       |         | Additional instructions appended to the review prompt    |
+
+*Either a positional argument or `--pr` is required.
+**Not required when a URL is used (workspace and repo are extracted from it).
+Otherwise required unless set in config file or env vars.
+
+The agent must be configured in your config file under `agent.agents` (see
+[Configuration](#configuration)). The agent binary must be installed and
+available on your `PATH`.
+
+### `models`
+
+Lists available models from an ACP agent. Useful for discovering which model
+IDs to pass via `--model`.
+
+```bash
+# List models from a configured agent
+crobot models --agent claude
+
+# List models from an agent command
+crobot models --agent-command "gemini --experimental-acp"
+```
+
+| Flag              | Type   | Required | Default | Description                                              |
+|-------------------|--------|----------|---------|----------------------------------------------------------|
+| `--agent`         | string | no       | config  | ACP agent name (from config)                             |
+| `--agent-command` | string | no       |         | ACP agent command with args                              |
+
 ### `serve`
 
 Starts CRoBot as an MCP (Model Context Protocol) server over stdio. This
@@ -268,6 +417,19 @@ crobot serve --mcp
 
 The server exposes the same four tools as the [CLI](#commands): `export_pr_context`,
 `get_file_snippet`, `list_bot_comments`, and `apply_review_findings`.
+
+### `review-instructions`
+
+Prints the CRoBot review methodology, finding schema, workflow, and rules
+to stdout. AI agents should read this output before performing a code review.
+
+```bash
+crobot review-instructions
+```
+
+This is the CLI counterpart to the MCP server's built-in instructions. MCP
+agents receive these instructions automatically on connection; CLI agents
+should run this command first.
 
 ### Global Flags
 
@@ -316,6 +478,12 @@ The server exposes the same four tools as the [CLI](#commands): `export_pr_conte
 
 ## Configuration
 
+> **Security Warning:** CRoBot loads `.crobot.yaml` from the **current working
+> directory**. A malicious repository could include a `.crobot.yaml` that
+> configures an arbitrary agent command, which `crobot review` would then
+> execute. **Do not run CRoBot in untrusted or unreviewed repositories.**
+> Always inspect `.crobot.yaml` before running CRoBot in a new project.
+
 CRoBot uses layered configuration. Values are resolved in this order (later
 layers override earlier ones):
 
@@ -342,13 +510,10 @@ bitbucket:
   # Default repository slug. Avoids passing --repo on every command.
   repo: my-service
 
-  # Atlassian account email for API authentication.
-  # Can also be "x-bitbucket-api-token-auth" as a static alternative.
-  user: you@example.com
-
-  # Bitbucket API token.
-  # Prefer env var CROBOT_BITBUCKET_TOKEN over storing in a file.
-  token: your-api-token
+  # Credentials (user and token) CANNOT be set in config files (yaml:"-").
+  # They must be provided via environment variables:
+  #   CROBOT_BITBUCKET_USER  -- Atlassian account email (or "x-bitbucket-api-token-auth")
+  #   CROBOT_BITBUCKET_TOKEN -- Bitbucket API token
 
 # Review behaviour settings.
 review:
@@ -365,16 +530,29 @@ review:
   # Options: "info", "warning", "error".
   severity_threshold: warning
 
-# Agent runner settings (Phase 3 - not yet implemented).
-# agent:
-#   default: claude
-#   agents:
-#     claude:
-#       command: claude
-#       args: ["--model", "sonnet-4"]
-#   timeout: 300
+# Agent runner settings (for `crobot review` command).
+agent:
+  # Default agent to use when --agent is not specified.
+  default: claude
 
-# AI provider settings (Phase 4 - not yet implemented).
+  # Default model ID to request from the agent (optional).
+  # Can also be set via CROBOT_MODEL env var or --model flag.
+  # model: gemini-2.5-pro
+
+  # Named agent configurations. Each entry defines an ACP-compatible agent
+  # subprocess that CRoBot can spawn.
+  #
+  # Most agents don't speak ACP natively. Use an ACP adapter:
+  #   npm install -g @zed-industries/claude-agent-acp
+  agents:
+    claude:
+      command: claude-agent-acp
+      args: []
+
+  # Overall timeout in seconds for the agent subprocess. Default: 300 (5 min).
+  timeout: 600
+
+# AI provider settings (Phase 5 - not yet implemented).
 # ai:
 #   default_provider: anthropic
 #   providers:
@@ -397,17 +575,18 @@ Environment variables override config file values.
 | `CROBOT_BITBUCKET_TOKEN`       | Bitbucket API token                              |              |
 | `CROBOT_MAX_COMMENTS`          | Max comments per run                             | `25`         |
 | `CROBOT_DRY_RUN`               | Default dry-run mode (`true`, `1`, `yes`)        | `true`       |
-| `CROBOT_AGENT`                 | Default agent name (Phase 3)                     |              |
-| `CROBOT_AI_PROVIDER`           | Default AI provider (Phase 4)                    |              |
-| `CROBOT_ANTHROPIC_API_KEY`     | Anthropic API key (Phase 4)                      |              |
-| `CROBOT_OPENAI_API_KEY`        | OpenAI API key (Phase 4)                         |              |
-| `CROBOT_GOOGLE_API_KEY`        | Google API key (Phase 4)                         |              |
-| `CROBOT_OPENROUTER_API_KEY`    | OpenRouter API key (Phase 4)                     |              |
+| `CROBOT_AGENT`                 | Default agent name for `crobot review`           |              |
+| `CROBOT_MODEL`                 | Default model ID to request from the agent       |              |
+| `CROBOT_AI_PROVIDER`           | Default AI provider (Phase 5)                    |              |
+| `CROBOT_ANTHROPIC_API_KEY`     | Anthropic API key (Phase 5)                      |              |
+| `CROBOT_OPENAI_API_KEY`        | OpenAI API key (Phase 5)                         |              |
+| `CROBOT_GOOGLE_API_KEY`        | Google API key (Phase 5)                         |              |
+| `CROBOT_OPENROUTER_API_KEY`    | OpenRouter API key (Phase 5)                     |              |
 
 ### Recommended Setup
 
-**For local development** -- use a global config file with credentials and
-defaults:
+**For local development** -- use a global config file with defaults and set
+credentials via environment variables:
 
 ```yaml
 # ~/.config/crobot/config.yaml
@@ -415,8 +594,7 @@ platform: bitbucket
 
 bitbucket:
   workspace: myteam
-  user: you@example.com
-  token: your-api-token
+  # Credentials must be set via env vars: CROBOT_BITBUCKET_USER, CROBOT_BITBUCKET_TOKEN
 ```
 
 Then add a per-repo `.crobot.yaml` to set the repository:
@@ -447,7 +625,40 @@ export CROBOT_BITBUCKET_REPO="$REPO"
 
 ## CI/CD Integration
 
-### Bitbucket Pipelines
+### Using `crobot review` (Recommended)
+
+The simplest CI integration uses `crobot review` to handle the entire flow:
+
+**Bitbucket Pipelines:**
+
+```yaml
+- step:
+    name: AI Code Review
+    script:
+      - export CROBOT_BITBUCKET_USER=$BITBUCKET_USER
+      - export CROBOT_BITBUCKET_TOKEN=$BITBUCKET_TOKEN
+      - export CROBOT_BITBUCKET_WORKSPACE=$BITBUCKET_WORKSPACE
+      - export CROBOT_BITBUCKET_REPO=$BITBUCKET_REPO_SLUG
+      - crobot review $BITBUCKET_PR_ID --agent claude --write
+```
+
+**GitHub Actions:**
+
+```yaml
+- name: AI Code Review
+  env:
+    CROBOT_BITBUCKET_USER: ${{ secrets.BITBUCKET_USER }}
+    CROBOT_BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
+    CROBOT_BITBUCKET_WORKSPACE: myteam
+    CROBOT_BITBUCKET_REPO: my-service
+  run: crobot review ${{ github.event.pull_request.number }} --agent claude --write
+```
+
+### Using Individual Commands
+
+For more control, use the step-by-step commands:
+
+**Bitbucket Pipelines:**
 
 ```yaml
 - step:
@@ -462,12 +673,11 @@ export CROBOT_BITBUCKET_REPO="$REPO"
       - crobot apply-review-findings --pr $BITBUCKET_PR_ID --input findings.json --write
 ```
 
-### GitHub Actions
+**GitHub Actions:**
 
 ```yaml
 - name: AI Code Review
   env:
-    CROBOT_PLATFORM: bitbucket  # or github when supported
     CROBOT_BITBUCKET_USER: ${{ secrets.BITBUCKET_USER }}
     CROBOT_BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
     CROBOT_BITBUCKET_WORKSPACE: myteam
@@ -482,7 +692,40 @@ export CROBOT_BITBUCKET_REPO="$REPO"
 
 ## Agent Integration
 
-### MCP Server (Recommended)
+### ACP Orchestrator (`crobot review`)
+
+The `review` command uses the Agent Client Protocol (ACP) to spawn any
+compatible agent as a subprocess, send it the PR diff and review instructions,
+and collect structured findings. The agent runs in a sandboxed, read-only mode:
+it can read files from the repository at the PR's head commit but cannot write
+files or run terminal commands.
+
+Most AI coding agents don't speak ACP natively. Use an ACP adapter such as
+[claude-agent-acp](https://github.com/zed-industries/claude-agent-acp):
+
+```bash
+npm install -g @zed-industries/claude-agent-acp
+```
+
+Configure agents in your config file:
+
+```yaml
+agent:
+  default: claude
+  agents:
+    claude:
+      command: claude-agent-acp
+      args: []
+  timeout: 600
+```
+
+Then run:
+
+```bash
+crobot review https://bitbucket.org/myteam/my-service/pull-requests/42 --write
+```
+
+### MCP Server
 
 MCP-capable agents (e.g. Claude Code) can use CRoBot as a native tool server.
 Add a `.mcp.json` to your project root:
@@ -516,17 +759,23 @@ No shell commands needed. The `apply_review_findings` tool defaults to dry-run
 mode and is annotated as destructive, so agents will ask for confirmation
 before posting.
 
-### Instruction Files
+The MCP server delivers the full review methodology (finding schema, workflow,
+severity guidelines, rules) to the agent automatically on connection via the
+MCP instructions field.
 
-CRoBot also includes instruction files for agents that don't support MCP:
+### CLI Agents
 
-| Agent               | Instruction File            |
-|---------------------|-----------------------------|
-| Claude Code         | `CLAUDE.md`                 |
-| Codex CLI / Copilot | `AGENTS.md`                 |
-| Reference           | `.ai/agent-instructions.md` |
+For agents using CLI commands, CRoBot ships a built-in review prompt via the
+`review-instructions` command. The agent runs it first to receive the review
+methodology, then follows the workflow:
 
-See `.ai/agent-instructions.md` for the full review workflow and rules.
+```bash
+crobot review-instructions   # agent reads this output, then follows it
+```
+
+A sample skill is included at `.agents/skills/review-pr.md`. Copy it to your
+project to enable the `/review-pr <number>` slash command, which instructs the
+agent to fetch and follow the CRoBot review instructions automatically.
 
 ---
 

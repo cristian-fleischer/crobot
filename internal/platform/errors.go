@@ -18,6 +18,9 @@ var (
 	// is not one of "info", "warning", or "error".
 	ErrInvalidSeverity = errors.New("severity must be \"info\", \"warning\", or \"error\"")
 
+	// ErrEmptyCategory indicates a ReviewFinding has an empty Category field.
+	ErrEmptyCategory = errors.New("category must not be empty")
+
 	// ErrEmptyMessage indicates a ReviewFinding has an empty Message field.
 	ErrEmptyMessage = errors.New("message must not be empty")
 

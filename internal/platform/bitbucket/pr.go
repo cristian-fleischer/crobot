@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/cristian-fleischer/crobot/internal/platform"
 )
@@ -52,12 +53,10 @@ type bbDiffStatEntry struct {
 // GetPRContext fetches pull request metadata, diffstat, and raw diff from the
 // Bitbucket Cloud API and returns a normalized PRContext.
 func (c *Client) GetPRContext(ctx context.Context, opts platform.PRRequest) (*platform.PRContext, error) {
-	workspace := opts.Workspace
-	if workspace == "" {
-		workspace = c.workspace
-	}
+	workspace := c.resolveWorkspace(opts.Workspace)
 
-	basePath := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d", workspace, opts.Repo, opts.PRNumber)
+	basePath := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d",
+		url.PathEscape(workspace), url.PathEscape(opts.Repo), opts.PRNumber)
 
 	// Fetch PR metadata.
 	prBody, err := c.do(ctx, "GET", basePath, nil)
@@ -154,7 +153,7 @@ func (c *Client) fetchDiff(ctx context.Context, path string) ([]platform.DiffHun
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
 	if err != nil {
 		return nil, fmt.Errorf("reading diff body: %w", err)
 	}

@@ -22,6 +22,13 @@ var cliCommands string
 //go:embed workflow_cli.md
 var cliWorkflow string
 
+// CoreInstructions returns the core review methodology, finding schema, and
+// rules — without any workflow. Used by the ACP orchestrator which provides
+// its own self-contained workflow.
+func CoreInstructions() string {
+	return coreInstructions
+}
+
 // MCPInstructions returns the review instructions for MCP-connected agents.
 // MCP agents discover tools automatically, so this omits CLI command syntax
 // and references tool names instead.

@@ -21,22 +21,10 @@ jobs:
           go-version-file: go.mod
       - name: Run tests
         run: go test -race ./...
-      - name: Build binaries
-        run: |
-          VERSION=${GITHUB_REF_NAME}
-          LDFLAGS="-s -w -X github.com/cristian-fleischer/crobot/internal/cli.version=${VERSION}"
-          
-          for GOOS in linux darwin windows; do
-            for GOARCH in amd64 arm64; do
-              ext=""
-              if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-              output="crobot-${GOOS}-${GOARCH}${ext}"
-              echo "Building ${output}..."
-              GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -o "$output" ./cmd/crobot
-            done
-          done
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          files: crobot-*
-          generate_release_notes: true
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

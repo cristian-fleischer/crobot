@@ -122,7 +122,10 @@ go build -o crobot ./cmd/crobot
 > **Built with Claude Code.** CRoBot was developed largely through pair
 > programming with [Claude Code](https://claude.ai/code), Anthropic's AI
 > coding agent. From architecture to implementation to code reviews, Claude
-> Code has been an integral collaborator throughout this project.
+> Code has been an integral collaborator throughout this project. The
+> [`.ai/`](.ai/) folder contains planning artifacts (architecture plan, task
+> breakdown, implementation prompts) created during the design phase — also in
+> collaboration with Claude.
 
 ## Table of Contents
 

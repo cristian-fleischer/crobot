@@ -1,6 +1,12 @@
 ## Workflow
 
-Follow these steps in order:
+**IMPORTANT: You are a read-only reviewer.** Do NOT modify, edit, write, or
+delete any files, code, or resources. Do NOT run any commands that change state.
+Only read and analyze code.
+
+### PR Review
+
+Follow these steps in order when reviewing a pull request:
 
 1. Call `export_pr_context` to get PR metadata, changed files, and diffs.
 2. Read the PR title and description to understand the intent. Identify primary
@@ -13,3 +19,15 @@ Follow these steps in order:
 6. Call `apply_review_findings` with `dry_run: true` to validate.
 7. If dry-run passes, call `apply_review_findings` with `dry_run: false`
    to post.
+
+### Local Review (Pre-Push)
+
+When reviewing local changes that haven't been pushed yet:
+
+1. Call `export_local_context` to get the diff of local changes against a base
+   branch. Optionally specify `base_branch` (default: "master").
+2. Read the diff and changed files to understand the scope of changes.
+3. For each changed file, read the full file from disk for additional context.
+4. Formulate findings as a JSON array of ReviewFinding objects.
+5. Output the findings directly — do NOT call `apply_review_findings` since
+   there is no pull request to post to.

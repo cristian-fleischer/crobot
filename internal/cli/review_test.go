@@ -15,17 +15,20 @@ func isolateConfig(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 }
 
-func TestReviewCmd_MissingPR(t *testing.T) {
+func TestReviewCmd_NoPR_EntersLocalMode(t *testing.T) {
 	t.Parallel()
 
+	// When no PR is given, the command enters local mode. It will fail
+	// later (agent resolution, etc.) but should NOT fail with "PR required".
 	cmd := RootCmd()
 	cmd.SetArgs([]string{"review", "--workspace", "ws", "--repo", "rp"})
 	err := cmd.Execute()
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		return // success means local mode worked (unlikely without agent config)
 	}
-	if !strings.Contains(err.Error(), "pull request URL or number is required") {
-		t.Errorf("error %q does not mention required PR", err.Error())
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "pull request URL or number is required") {
+		t.Errorf("no-PR should enter local mode, not require a PR; got: %q", errMsg)
 	}
 }
 
@@ -257,6 +260,34 @@ func TestReviewCmd_InstructionsFlag(t *testing.T) {
 	instructions, _ := cmd.Flags().GetString("instructions")
 	if instructions != "focus on security" {
 		t.Errorf("instructions = %q, want %q", instructions, "focus on security")
+	}
+}
+
+func TestReviewCmd_BaseFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := newReviewCmd()
+	if err := cmd.ParseFlags([]string{"--base", "main"}); err != nil {
+		t.Fatalf("parsing flags: %v", err)
+	}
+
+	base, _ := cmd.Flags().GetString("base")
+	if base != "main" {
+		t.Errorf("base = %q, want %q", base, "main")
+	}
+}
+
+func TestReviewCmd_BaseFlagDefault(t *testing.T) {
+	t.Parallel()
+
+	cmd := newReviewCmd()
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("parsing flags: %v", err)
+	}
+
+	base, _ := cmd.Flags().GetString("base")
+	if base != "master" {
+		t.Errorf("base default = %q, want %q", base, "master")
 	}
 }
 

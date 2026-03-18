@@ -436,6 +436,61 @@
 
 ---
 
+## Phase 3.8: Local (Pre-Push) Review
+
+> Review local git changes before pushing. No PR or platform credentials needed.
+
+### P3.8.1 Local Platform Provider
+
+- [x] P3.8.1.1 Implement `local.Provider` (`internal/platform/local/provider.go`)
+  - [x] `GetPRContext` via `git diff` against merge-base (committed + staged + unstaged)
+  - [x] `GetFileContent` via `git show`
+  - [x] No-op `ListBotComments`, error on `CreateInlineComment`/`DeleteComment`
+  - [x] `parseNameStatus` helper for `git diff --name-status`
+  - [x] `RepoName()` from directory basename
+  - [x] Validate git repo exists and base branch is resolvable
+- [x] P3.8.1.2 Unit tests (`internal/platform/local/provider_test.go`)
+  - [x] Temp git repo with committed + unstaged changes
+  - [x] GetPRContext (fields, files, hunks, unstaged changes)
+  - [x] No changes, bad base branch, not a repo error cases
+  - [x] ListBotComments (empty), CreateInlineComment (error)
+  - [x] parseNameStatus edge cases
+  - [x] RepoName
+
+### P3.8.2 Enhanced Findings Rendering
+
+- [x] P3.8.2.1 `RenderFindings` function (`internal/cli/render.go`)
+  - [x] Diff context snippet with ANSI-colored line numbers
+  - [x] `extractDiffContext` — walk hunk body tracking old/new line counters
+  - [x] Target line highlighting, green/red diff coloring
+- [x] P3.8.2.2 Unit tests (`internal/cli/render_test.go`)
+  - [x] extractDiffContext with various line positions, wrong path, context window
+  - [x] renderDiffSnippet output verification
+
+### P3.8.3 CLI Wiring
+
+- [x] P3.8.3.1 Wire local mode into `review` command (`internal/cli/review.go`)
+  - [x] Detect local mode when no PR specified (`isLocalMode := prValue == ""`)
+  - [x] `--base` flag (default: `master`) for base branch
+  - [x] Force dry-run in local mode, construct synthetic PRRequest
+  - [x] Replace inline findings rendering with `RenderFindings()`
+  - [x] Updated help text and examples for local mode
+- [x] P3.8.3.2 Unit tests for `--base` flag parsing and defaults
+- [x] P3.8.3.3 Updated existing "missing PR" test for local mode behavior
+
+### P3.8.4 Prompt & MCP Support
+
+- [x] P3.8.4.1 Handle PR #0 in prompt metadata (`internal/agent/prompt.go`)
+  - [x] Show "Local Review" instead of "PR Number: 0"
+- [x] P3.8.4.2 `export_local_context` MCP tool (`internal/mcp/tools.go`, `handler.go`)
+  - [x] Parameters: `base_branch`, `repo_dir` (both optional)
+  - [x] Uses local provider to return PRContext JSON
+- [x] P3.8.4.3 Updated MCP workflow instructions (`workflow_mcp.md`)
+  - [x] Local review section with steps
+- [x] P3.8.4.4 Updated agent skill for local review support
+
+---
+
 ## Cross-Phase / Future
 
 - [x] GitHub platform adapter (`internal/platform/github/`)

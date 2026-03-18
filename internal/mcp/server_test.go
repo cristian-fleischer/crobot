@@ -32,6 +32,7 @@ func TestNewServer_RegistersAllTools(t *testing.T) {
 		"export_pr_context":     false,
 		"get_file_snippet":      false,
 		"list_bot_comments":     false,
+		"export_local_context":  false,
 		"apply_review_findings": false,
 	}
 

@@ -47,6 +47,17 @@ func toolDefinitions() []toolDef {
 			),
 		},
 		{
+			name: "export_local_context",
+			tool: mcp.NewTool("export_local_context",
+				mcp.WithDescription("Export local git changes (committed, staged, and unstaged) as a review context. "+
+					"Diffs the working tree against a base branch. Use this for pre-push local reviews "+
+					"when no pull request exists yet."),
+				mcp.WithString("base_branch", mcp.Description("Base branch to diff against (default: master)")),
+				mcp.WithString("repo_dir", mcp.Description("Path to the git repository (default: current directory)")),
+				mcp.WithReadOnlyHintAnnotation(true),
+			),
+		},
+		{
 			name: "apply_review_findings",
 			tool: mcp.NewTool("apply_review_findings",
 				mcp.WithDescription("Apply review findings as inline PR comments. Dry-run by default; set dry_run=false to post."),

@@ -14,6 +14,7 @@ import (
 	"github.com/cristian-fleischer/crobot/internal/agent"
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
+	localplatform "github.com/cristian-fleischer/crobot/internal/platform/local"
 	"github.com/cristian-fleischer/crobot/internal/review"
 	"github.com/mkozhukh/mdterm"
 	"github.com/spf13/cobra"
@@ -32,6 +33,7 @@ type ReviewOpts struct {
 	DryRun          bool
 	ShowAgentOutput bool
 	RawOutput       bool
+	LocalMode       bool
 }
 
 // newReviewCmd creates the review subcommand.
@@ -50,11 +52,12 @@ func newReviewCmd() *cobra.Command {
 		instructions    string
 		agentCommand    string
 		philosophyFlag  string
+		baseBranch      string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "review [pr-url-or-number]",
-		Short: "Run an AI-powered code review on a pull request",
+		Short: "Run an AI-powered code review on a pull request or local changes",
 		Long: `Spawns an ACP-compatible agent to review a PR and post inline comments.
 
 The PR can be specified as a positional argument or via --pr:
@@ -63,8 +66,18 @@ The PR can be specified as a positional argument or via --pr:
   crobot review --pr 42
 
 When a URL is provided, the workspace, repo, and PR number are extracted
-automatically, so --workspace and --repo are not needed.`,
-		Example: `  # Using a PR URL (workspace and repo deduced automatically)
+automatically, so --workspace and --repo are not needed.
+
+When no PR is specified, CRoBot enters local mode and reviews all changes
+(committed, staged, and unstaged) relative to a base branch. Local mode
+always runs as dry-run and renders findings to the terminal.`,
+		Example: `  # Review local changes against master (default)
+  crobot review
+
+  # Review local changes against a different base branch
+  crobot review --base main
+
+  # Using a PR URL (workspace and repo deduced automatically)
   crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
 
   # Using a PR number (requires workspace and repo from config or flags)
@@ -94,9 +107,9 @@ automatically, so --workspace and --repo are not needed.`,
 				}
 				prValue = args[0]
 			}
-			if prValue == "" {
-				return fmt.Errorf("a pull request URL or number is required (as argument or --pr flag)")
-			}
+
+			// Local mode: no PR specified — review local git changes.
+			isLocalMode := prValue == ""
 
 			// 1. Load config.
 			cfg, err := config.LoadDefault()
@@ -104,44 +117,58 @@ automatically, so --workspace and --repo are not needed.`,
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			// 2. Resolve PR reference (URL or number).
-			pr, err := resolvePRFlag(prValue, workspace, repo, cfg)
-			if err != nil {
-				return err
-			}
+			var pr *platform.PRRequest
+			var plat platform.Platform
 
-			// 3. Auto-detect platform from URL when applicable.
-			if platform.IsPRURL(prValue) {
-				if detected := platform.PlatformFromURL(prValue); detected != "" {
-					cfg.Platform = detected
+			if isLocalMode {
+				localPlat := localplatform.New(baseBranch, ".")
+				plat = localPlat
+				isDryRun = true // local mode never posts
+				pr = &platform.PRRequest{
+					Workspace: "local",
+					Repo:      localPlat.RepoName(),
+					PRNumber:  0,
+				}
+			} else {
+				// 2. Resolve PR reference (URL or number).
+				pr, err = resolvePRFlag(prValue, workspace, repo, cfg)
+				if err != nil {
+					return err
+				}
+
+				// 3. Auto-detect platform from URL when applicable.
+				if platform.IsPRURL(prValue) {
+					if detected := platform.PlatformFromURL(prValue); detected != "" {
+						cfg.Platform = detected
+					}
+				}
+
+				// 4. Build platform client.
+				plat, err = buildPlatform(cfg)
+				if err != nil {
+					return fmt.Errorf("creating platform client: %w", err)
 				}
 			}
 
-			// 4. Build platform client.
-			plat, err := buildPlatform(cfg)
-			if err != nil {
-				return fmt.Errorf("creating platform client: %w", err)
-			}
-
-			// 4. Resolve agent config.
+			// 5. Resolve agent config.
 			agentCfg, err := resolveAgentConfig(cfg, agentName, agentCommand)
 			if err != nil {
 				return fmt.Errorf("resolving agent config: %w", err)
 			}
 
-			// 5. Resolve max comments: CLI flag > config default.
+			// 6. Resolve max comments: CLI flag > config default.
 			mc := cfg.Review.MaxComments
 			if cmd.Flags().Changed("max-comments") {
 				mc = maxComments
 			}
 
-			// 6. Resolve model: --model flag > CROBOT_MODEL env > config.
+			// 7. Resolve model: --model flag > CROBOT_MODEL env > config.
 			modelID := modelFlag
 			if modelID == "" {
 				modelID = cfg.Agent.Model
 			}
 
-			// 7. Resolve review philosophy: CLI flag > env > config > file convention > default.
+			// 8. Resolve review philosophy: CLI flag > env > config > file convention > default.
 			if cmd.Flags().Changed("review-philosophy") {
 				cfg.Review.PhilosophyPath = philosophyFlag
 			}
@@ -162,6 +189,7 @@ automatically, so --workspace and --repo are not needed.`,
 				DryRun:          isDryRun,
 				ShowAgentOutput: showAgentOutput,
 				RawOutput:       rawOutput,
+				LocalMode:       isLocalMode,
 			}
 
 			result, err := runReview(cmd.Context(), opts)
@@ -190,6 +218,7 @@ automatically, so --workspace and --repo are not needed.`,
 	cmd.Flags().BoolVar(&rawOutput, "raw", false, "Disable markdown formatting of agent output (use with --show-agent-output)")
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
 	cmd.Flags().StringVar(&philosophyFlag, "review-philosophy", "", "Path to a custom review philosophy markdown file")
+	cmd.Flags().StringVar(&baseBranch, "base", "master", "Base branch for local review (used when no PR is specified)")
 	return cmd
 }
 
@@ -342,21 +371,8 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 	}
 
 	// 7. Print rendered comments to stderr for human preview.
-	if opts.ShowAgentOutput && len(engineResult.Posted) > 0 {
-		mdRenderer := mdterm.New(os.Stderr)
-		fmt.Fprintf(os.Stderr, "\n%s--- REVIEW COMMENTS (%d) ---%s\n", ansiDim, len(engineResult.Posted), ansiReset)
-		for i, p := range engineResult.Posted {
-			fmt.Fprintf(os.Stderr, "\n%s%s:%d (%s)%s\n", ansiDim, p.Finding.Path, p.Finding.Line, p.Finding.Side, ansiReset)
-			if opts.RawOutput {
-				fmt.Fprintf(os.Stderr, "%s\n", p.RenderedBody)
-			} else {
-				mdRenderer.Render(p.RenderedBody)
-			}
-			if i < len(engineResult.Posted)-1 {
-				fmt.Fprintf(os.Stderr, "%s───%s\n", ansiDim, ansiReset)
-			}
-		}
-		fmt.Fprintf(os.Stderr, "\n%s--- END REVIEW COMMENTS ---%s\n", ansiDim, ansiReset)
+	if (opts.LocalMode || opts.ShowAgentOutput) && len(engineResult.Posted) > 0 {
+		RenderFindings(engineResult.Posted, prCtx.DiffHunks, os.Stderr, opts.RawOutput)
 	}
 
 	return engineResult, nil

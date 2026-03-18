@@ -8,6 +8,7 @@ import (
 
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
+	localplatform "github.com/cristian-fleischer/crobot/internal/platform/local"
 	"github.com/cristian-fleischer/crobot/internal/review"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -38,6 +39,8 @@ func (h *handler) dispatch(name string) func(ctx context.Context, req mcp.CallTo
 			return h.handleGetFileSnippet(ctx, req)
 		case "list_bot_comments":
 			return h.handleListBotComments(ctx, req)
+		case "export_local_context":
+			return h.handleExportLocalContext(ctx, req)
 		case "apply_review_findings":
 			return h.handleApplyReviewFindings(ctx, req)
 		default:
@@ -140,6 +143,25 @@ func (h *handler) handleListBotComments(ctx context.Context, req mcp.CallToolReq
 	data, err := json.MarshalIndent(comments, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshaling comments: %w", err)
+	}
+
+	return mcp.NewToolResultText(string(data)), nil
+}
+
+// handleExportLocalContext builds a PRContext from local git state and returns it as JSON.
+func (h *handler) handleExportLocalContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	baseBranch := mcp.ParseString(req, "base_branch", "master")
+	repoDir := mcp.ParseString(req, "repo_dir", ".")
+
+	provider := localplatform.New(baseBranch, repoDir)
+	prCtx, err := provider.GetPRContext(ctx, platform.PRRequest{})
+	if err != nil {
+		return toolError("failed to export local context", err), nil
+	}
+
+	data, err := json.MarshalIndent(prCtx, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshaling local context: %w", err)
 	}
 
 	return mcp.NewToolResultText(string(data)), nil

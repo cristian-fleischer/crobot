@@ -31,11 +31,17 @@ func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) strin
 	b.WriteString("# Pull Request Review\n\n")
 
 	// PR metadata
-	b.WriteString("## PR Metadata\n\n")
-	if ref != nil {
-		b.WriteString(fmt.Sprintf("- **Workspace**: %s\n", ref.Workspace))
+	if ref != nil && ref.PRNumber == 0 {
+		b.WriteString("## Local Review Metadata\n\n")
 		b.WriteString(fmt.Sprintf("- **Repository**: %s\n", ref.Repo))
-		b.WriteString(fmt.Sprintf("- **PR Number**: %d\n", ref.PRNumber))
+		b.WriteString("- **Mode**: Local (pre-push review)\n")
+	} else {
+		b.WriteString("## PR Metadata\n\n")
+		if ref != nil {
+			b.WriteString(fmt.Sprintf("- **Workspace**: %s\n", ref.Workspace))
+			b.WriteString(fmt.Sprintf("- **Repository**: %s\n", ref.Repo))
+			b.WriteString(fmt.Sprintf("- **PR Number**: %d\n", ref.PRNumber))
+		}
 	}
 	b.WriteString(fmt.Sprintf("- **Title**: %s\n", prCtx.Title))
 	b.WriteString(fmt.Sprintf("- **Author**: %s\n", prCtx.Author))

@@ -27,6 +27,9 @@ developer's machine and in CI pipelines.
   markdown in the terminal with a live progress indicator.
 - **MCP server**: Expose all tools over the Model Context Protocol for direct
   agent integration via stdio.
+- **Local pre-push review**: Review local changes before pushing with
+  `crobot review` (no PR required). Diffs all changes (committed, staged, and
+  unstaged) against a base branch and renders findings in the terminal.
 - **Single binary**: No runtime dependencies.
 
 ## Use Cases
@@ -615,12 +618,22 @@ cat findings.json | crobot apply-review-findings \
 
 ### `review`
 
-Runs an end-to-end AI-powered code review on a pull request. CRoBot spawns an
-ACP-compatible agent subprocess, sends it the PR diff with review instructions,
-collects the agent's findings, validates them against the diff, deduplicates
-against existing comments, and posts inline review comments.
+Runs an end-to-end AI-powered code review on a pull request or local changes.
+CRoBot spawns an ACP-compatible agent subprocess, sends it the diff with review
+instructions, collects the agent's findings, validates them against the diff,
+deduplicates against existing comments, and posts inline review comments.
+
+When no PR is specified, CRoBot enters **local mode**: it diffs the working tree
+(committed, staged, and unstaged changes) against a base branch and renders
+findings directly in the terminal. Local mode always runs as dry-run.
 
 ```bash
+# Review local changes against master (no PR needed)
+crobot review
+
+# Review local changes against a different base branch
+crobot review --base main
+
 # Using a PR URL (simplest — workspace and repo deduced from the URL)
 crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
 
@@ -653,25 +666,26 @@ crobot review --pr 42
 The PR reference (URL or number) can be passed as a positional argument or via
 `--pr`. If both are provided, an error is returned.
 
-| Flag                  | Type   | Required | Default | Description                                              |
-|-----------------------|--------|----------|---------|----------------------------------------------------------|
-| (positional)          | string | no*      |         | PR number or URL as the first positional argument        |
-| `--pr`                | string | no*      |         | PR number or URL (alternative to positional argument)    |
-| `--workspace`         | string | no**     |         | Workspace/organization slug                              |
-| `--repo`              | string | no**     |         | Repository slug                                          |
-| `--agent`             | string | no       | config  | ACP agent name (from `agent.agents` in config)           |
-| `--agent-command`     | string | no       |         | ACP agent command with args, e.g. `"gemini --experimental-acp"` |
-| `-m`, `--model`       | string | no       | config  | Model ID to use, or `"ask"` for interactive selection    |
-| `--dry-run`           | bool   | no       | `true`  | Validate without posting (default behavior)              |
-| `--write`             | bool   | no       | `false` | Actually post comments to the PR                         |
-| `--max-comments`      | int    | no       | config  | Max comments to post (`0` = unlimited)                   |
-| `--show-agent-output` | bool   | no       | `false` | Stream formatted agent output with progress indicator    |
-| `--raw`               | bool   | no       | `false` | Disable markdown formatting and progress indicator       |
-| `-i`, `--instructions`| string | no       |         | Additional instructions appended to the review prompt    |
+| Flag                  | Type   | Required | Default    | Description                                              |
+|-----------------------|--------|----------|------------|----------------------------------------------------------|
+| (positional)          | string | no*      |            | PR number or URL as the first positional argument        |
+| `--pr`                | string | no*      |            | PR number or URL (alternative to positional argument)    |
+| `--workspace`         | string | no**     |            | Workspace/organization slug                              |
+| `--repo`              | string | no**     |            | Repository slug                                          |
+| `--base`              | string | no       | `master`   | Base branch for local review (when no PR is specified)   |
+| `--agent`             | string | no       | config     | ACP agent name (from `agent.agents` in config)           |
+| `--agent-command`     | string | no       |            | ACP agent command with args, e.g. `"gemini --experimental-acp"` |
+| `-m`, `--model`       | string | no       | config     | Model ID to use, or `"ask"` for interactive selection    |
+| `--dry-run`           | bool   | no       | `true`     | Validate without posting (default behavior)              |
+| `--write`             | bool   | no       | `false`    | Actually post comments to the PR                         |
+| `--max-comments`      | int    | no       | config     | Max comments to post (`0` = unlimited)                   |
+| `--show-agent-output` | bool   | no       | `false`    | Stream formatted agent output with progress indicator    |
+| `--raw`               | bool   | no       | `false`    | Disable markdown formatting and progress indicator       |
+| `-i`, `--instructions`| string | no       |            | Additional instructions appended to the review prompt    |
 
-*Either a positional argument or `--pr` is required.
-**Not required when a URL is used (workspace and repo are extracted from it).
-Otherwise required unless set in config file or env vars.
+*When omitted, CRoBot enters local mode and reviews local git changes.
+**Not required when a URL is used (workspace and repo are extracted from it)
+or in local mode. Otherwise required unless set in config file or env vars.
 
 The agent must be configured in your config file under `agent.agents` (see
 [Configuration](#configuration)). The agent binary must be installed and
@@ -709,8 +723,9 @@ crobot serve --mcp
 |---------|------|----------|---------|--------------------------------------|
 | `--mcp` | bool | yes      | `false` | Start as MCP server over stdio       |
 
-The server exposes the same four tools as the [CLI](#commands): `export_pr_context`,
-`get_file_snippet`, `list_bot_comments`, and `apply_review_findings`.
+The server exposes the following tools: `export_pr_context`,
+`get_file_snippet`, `list_bot_comments`, `export_local_context`, and
+`apply_review_findings`.
 
 ### `review-instructions`
 

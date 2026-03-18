@@ -598,6 +598,22 @@ Agents that already support ACP (as of early 2026):
 
 Full list: https://agentclientprotocol.com/get-started/agents
 
+### Local (Pre-Push) Review (P3.8)
+
+CRoBot supports reviewing local git changes before pushing — no PR or platform
+credentials needed. When `crobot review` is invoked without a PR, it enters
+local mode:
+
+- **Source**: `git diff <merge-base>` against a base branch (default: `master`,
+  configurable via `--base`), capturing committed + staged + unstaged changes.
+- **Provider**: `internal/platform/local/provider.go` implements `Platform`
+  using local git commands. No-op for list/create/delete comments.
+- **Rendering**: `internal/cli/render.go` provides enhanced findings display
+  with ANSI-colored diff context snippets around each finding.
+- **Dry-run only**: Local mode never posts comments (no PR to post to).
+- **MCP support**: `export_local_context` tool lets MCP-connected agents
+  review local changes.
+
 ---
 
 ## Phase 4: Native Agent SDK Adapters
@@ -865,6 +881,8 @@ CRoBot/
         diff.go                     # diff/diffstat parsing      (P1)
         comments.go                 # comment CRUD               (P1)
         file.go                     # file content retrieval     (P1)
+      local/
+        provider.go                 # local git diff provider    (P3.8)
       # github/                     # future
       # gitlab/                     # future
 

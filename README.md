@@ -81,10 +81,11 @@ skills/slash commands), scenarios where you need full control over each step.
 
 ### Quick Setup (Recommended)
 
-Run the interactive setup wizard from your project directory. It walks you
-through platform credentials, usage modes, agent configuration, and review
-settings — generating config files, `.mcp.json`, and printing next steps.
-Re-runnable; existing values are loaded as defaults.
+Run the interactive setup wizard from your project directory. It installs the
+latest CRoBot binary (if missing), then walks you through platform credentials,
+usage modes, agent configuration, and review settings — generating config
+files, `.mcp.json`, and printing next steps. Re-runnable; existing values are
+loaded as defaults.
 
 ```bash
 curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh

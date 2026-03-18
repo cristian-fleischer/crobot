@@ -212,6 +212,156 @@ GLOBAL_CONFIG="$GLOBAL_DIR/config.yaml"
 LOCAL_CONFIG=".crobot.yaml"
 
 # ---------------------------------------------------------------------------
+# Step 0: Install crobot binary (if missing)
+# ---------------------------------------------------------------------------
+
+GITHUB_REPO="cristian-fleischer/crobot"
+
+# detect_os prints the OS name matching GoReleaser naming.
+detect_os() {
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  case "$os" in
+    linux*)  echo "linux" ;;
+    darwin*) echo "darwin" ;;
+    mingw*|msys*|cygwin*) echo "windows" ;;
+    *) echo "$os" ;;
+  esac
+}
+
+# detect_arch prints the architecture matching GoReleaser naming.
+detect_arch() {
+  local arch
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64)  echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) echo "$arch" ;;
+  esac
+}
+
+# install_dir picks the best writable bin directory.
+pick_install_dir() {
+  # Prefer /usr/local/bin if writable, else ~/.local/bin.
+  if [[ -w "/usr/local/bin" ]]; then
+    echo "/usr/local/bin"
+  else
+    local user_bin="$HOME/.local/bin"
+    mkdir -p "$user_bin"
+    echo "$user_bin"
+  fi
+}
+
+step_install() {
+  if command -v crobot &>/dev/null; then
+    local current_version
+    current_version=$(crobot --version 2>/dev/null | grep -oP '\d+\.\d+\.\S+' || echo "unknown")
+    info "CRoBot is already installed (v${current_version})."
+    return
+  fi
+
+  header "Install CRoBot"
+
+  info "CRoBot binary not found on your system."
+  if ! confirm "Download and install the latest release?"; then
+    warn "Skipping install. You can install manually later."
+    warn "See: https://github.com/${GITHUB_REPO}/releases"
+    return
+  fi
+
+  local os arch
+  os=$(detect_os)
+  arch=$(detect_arch)
+
+  if [[ "$os" == "windows" ]]; then
+    warn "Automatic install is not supported on Windows."
+    info "Download manually from: https://github.com/${GITHUB_REPO}/releases"
+    return
+  fi
+
+  info "Detected platform: ${os}/${arch}"
+
+  # Fetch latest release tag.
+  info "Fetching latest release..."
+  local release_info tag
+  release_info=$(curl -sS "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null) || {
+    error "Failed to fetch release info from GitHub."
+    return
+  }
+  tag=$(echo "$release_info" | grep -oP '"tag_name":\s*"\K[^"]+' || true)
+  if [[ -z "$tag" ]]; then
+    error "Could not determine latest release version."
+    return
+  fi
+  # Strip leading 'v' for the archive name.
+  local version="${tag#v}"
+
+  info "Latest release: ${tag}"
+
+  local archive_name="crobot_${version}_${os}_${arch}.tar.gz"
+  local download_url="https://github.com/${GITHUB_REPO}/releases/download/${tag}/${archive_name}"
+
+  local install_dir
+  install_dir=$(pick_install_dir)
+
+  info "Downloading ${archive_name}..."
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmpdir'" EXIT
+
+  if ! curl -sSL -o "${tmpdir}/${archive_name}" "$download_url" 2>/dev/null; then
+    error "Download failed. Check your network connection."
+    info "URL: $download_url"
+    rm -rf "$tmpdir"
+    return
+  fi
+
+  # Verify we got a real archive (not an HTML error page).
+  if ! file "${tmpdir}/${archive_name}" | grep -q 'gzip'; then
+    error "Downloaded file is not a valid archive. The release may not exist for ${os}/${arch}."
+    info "Download manually from: https://github.com/${GITHUB_REPO}/releases"
+    rm -rf "$tmpdir"
+    return
+  fi
+
+  info "Extracting to ${install_dir}..."
+  tar -xzf "${tmpdir}/${archive_name}" -C "$tmpdir"
+
+  if [[ ! -f "${tmpdir}/crobot" ]]; then
+    error "Archive did not contain a 'crobot' binary."
+    rm -rf "$tmpdir"
+    return
+  fi
+
+  chmod +x "${tmpdir}/crobot"
+
+  # Use sudo if needed for the install dir.
+  if [[ -w "$install_dir" ]]; then
+    mv "${tmpdir}/crobot" "${install_dir}/crobot"
+  else
+    info "Need sudo to install to ${install_dir}."
+    sudo mv "${tmpdir}/crobot" "${install_dir}/crobot"
+  fi
+
+  rm -rf "$tmpdir"
+
+  # Verify installation.
+  if command -v crobot &>/dev/null; then
+    success "CRoBot ${tag} installed to ${install_dir}/crobot"
+  else
+    success "Installed to ${install_dir}/crobot"
+    if [[ "$install_dir" == "$HOME/.local/bin" ]]; then
+      warn "${install_dir} is not in your PATH."
+      info "Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+      echo ""
+      printf '  %bexport PATH="%s:\$PATH"%b\n' "$DIM" "$install_dir" "$RESET" >&2
+      echo ""
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Step 1: Detect existing configuration
 # ---------------------------------------------------------------------------
 
@@ -1096,6 +1246,7 @@ step_validate() {
 # ---------------------------------------------------------------------------
 
 main() {
+  step_install
   step_detect_existing
   step_scope
   step_platform

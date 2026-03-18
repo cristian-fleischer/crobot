@@ -1,0 +1,10 @@
+platform: github
+
+github:
+  owner: test-org
+  repo: test-repo
+  token: ghp_test123
+
+review:
+  max_comments: 30
+  dry_run: false

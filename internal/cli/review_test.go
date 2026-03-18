@@ -416,8 +416,16 @@ func TestResolvePRFlag_TableDriven(t *testing.T) {
 			wantPR:        42,
 		},
 		{
+			name:          "URL with GitHub host",
+			prFlag:        "https://github.com/owner/repo/pull/123",
+			cfg:           config.Defaults(),
+			wantWorkspace: "owner",
+			wantRepo:      "repo",
+			wantPR:        123,
+		},
+		{
 			name:      "URL with unsupported host",
-			prFlag:    "https://github.com/owner/repo/pull/123",
+			prFlag:    "https://gitlab.com/owner/repo/merge_requests/123",
 			cfg:       config.Defaults(),
 			wantErr:   true,
 			errSubstr: "parsing PR URL",

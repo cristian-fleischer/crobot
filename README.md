@@ -7,55 +7,105 @@ AI-generated review findings against the actual diff, deduplicates against
 existing comments, and posts inline review comments. The same binary works on a
 developer's machine and in CI pipelines.
 
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Setting Up Bitbucket Authentication](#setting-up-bitbucket-authentication)
-- [Quickstart](#quickstart)
-- [Commands](#commands)
-  - [`models`](#models)
-- [ReviewFinding Schema](#reviewfinding-schema)
-- [Configuration](#configuration)
-- [CI/CD Integration](#cicd-integration)
-- [Agent Integration](#agent-integration)
-- [Development](#development)
-- [License](#license)
-
 ## Features
 
-- **Platform-agnostic**: Bitbucket Cloud supported today; GitHub and GitLab
-  planned.
+- **One-command review**: `crobot review <pr-url>` spawns an AI agent, feeds it
+  the PR diff, and posts inline comments -- fully automated.
+- **Three integration modes**: Use CRoBot as an autonomous orchestrator, as an
+  MCP tool server for interactive agent sessions, or as a CLI toolkit for
+  maximum flexibility (see [Use Cases](#use-cases) below).
+- **Platform-agnostic**: Bitbucket Cloud and GitHub supported; GitLab planned.
 - **Agent-agnostic**: Works with any AI coding agent (Claude Code, Codex CLI,
-  OpenCode, Copilot) or directly via AI provider APIs (planned).
-- **One-command review**: `crobot review https://bitbucket.org/team/repo/pull-requests/42`
-  spawns an ACP-compatible agent, feeds it the PR diff, and posts inline
-  comments -- fully automated.
+  OpenCode, Gemini, Copilot) or directly via AI provider APIs (planned).
 - **Safe by default**: Dry-run mode is the default. Use `--write` to post.
 - **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs.
 - **Diff-aware validation**: Only allows comments on lines actually changed in
   the PR.
-- **ACP orchestrator**: Spawns and manages any ACP-compatible agent subprocess
-  (Claude, Codex, Gemini, OpenCode) to perform end-to-end reviews.
+- **Customizable review philosophy**: Export, edit, and override the review
+  focus to match your project's needs (see [Configuration](#configuration)).
 - **Formatted streaming output**: Agent output is rendered as formatted
-  markdown in the terminal with a live progress indicator showing elapsed time,
-  prompt/response sizes, and current agent activity.
-- **MCP server**: Expose all tools over the Model Context Protocol (MCP) for
-  direct agent integration via stdio.
+  markdown in the terminal with a live progress indicator.
+- **MCP server**: Expose all tools over the Model Context Protocol for direct
+  agent integration via stdio.
 - **Single binary**: No runtime dependencies.
 
+## Use Cases
+
+CRoBot supports three integration modes, each suited to different workflows:
+
+### Orchestrated (`crobot review`)
+
+CRoBot drives the AI agent end-to-end. One command fetches the PR, spawns the
+agent, collects findings, and posts comments. No human interaction required.
+
+```bash
+crobot review https://bitbucket.org/team/repo/pull-requests/42 --write
+```
+
+**Best for:** CI/CD pipelines, automated review on every PR, hands-off
+workflows where reviews should happen without human intervention.
+
+### Interactive (MCP Server)
+
+CRoBot runs as an MCP tool server. An MCP-capable agent (Claude Code, Cursor,
+etc.) discovers CRoBot's tools and the human guides the review interactively.
+
+```json
+{ "mcpServers": { "crobot": { "command": "crobot", "args": ["serve", "--mcp"] } } }
+```
+
+**Best for:** Interactive development sessions where you want to review PRs
+conversationally, ask follow-up questions, iterate on findings, or combine code
+review with other agent tasks.
+
+### Toolkit (CLI Commands)
+
+The agent (or a human) calls individual CRoBot commands
+(`export-pr-context`, `apply-review-findings`, etc.) as discrete steps. Install
+a skill to teach the agent the workflow automatically.
+
+```bash
+# Install the review skill for your agent
+crobot export-skill --agent claude-code
+
+# Then use /review-pr <url> in your agent session
+```
+
+**Best for:** Custom agent workflows, agents that use shell commands (via
+skills/slash commands), scenarios where you need full control over each step.
+
 ## Installation
+
+### Quick Setup (Recommended)
+
+Run the interactive setup wizard from your project directory. It walks you
+through platform credentials, usage modes, agent configuration, and review
+settings — generating config files, `.mcp.json`, and printing next steps.
+Re-runnable; existing values are loaded as defaults.
+
+```bash
+curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
+```
+
+### From Releases
+
+Download the latest binary from the
+[Releases](https://github.com/cristian-fleischer/crobot/releases/latest) page,
+or use the CLI:
+
+```bash
+# Adjust OS (linux/darwin) and ARCH (amd64/arm64) as needed
+OS=linux ARCH=amd64
+VERSION=$(curl -sS https://api.github.com/repos/cristian-fleischer/crobot/releases/latest | grep -oP '"tag_name":\s*"v?\K[^"]+')
+curl -sL "https://github.com/cristian-fleischer/crobot/releases/latest/download/crobot_${VERSION}_${OS}_${ARCH}.tar.gz" | tar xz
+sudo mv crobot /usr/local/bin/
+```
 
 ### From Source
 
 ```bash
 go install github.com/cristian-fleischer/crobot/cmd/crobot@latest
 ```
-
-### From Releases
-
-Download the binary for your platform from the
-[Releases](https://github.com/cristian-fleischer/crobot/releases) page.
 
 ### Build from Source
 
@@ -64,6 +114,44 @@ git clone https://github.com/cristian-fleischer/crobot.git
 cd crobot
 go build -o crobot ./cmd/crobot
 ```
+
+> **Built with Claude Code.** CRoBot was developed largely through pair
+> programming with [Claude Code](https://claude.ai/code), Anthropic's AI
+> coding agent. From architecture to implementation to code reviews, Claude
+> Code has been an integral collaborator throughout this project.
+
+## Table of Contents
+
+- [Features](#features)
+- [Use Cases](#use-cases)
+- [Installation](#installation)
+- [Setting Up Bitbucket Authentication](#setting-up-bitbucket-authentication)
+- [Setting Up GitHub Authentication](#setting-up-github-authentication)
+- [Quickstart](#quickstart)
+- [How It Works](#how-it-works)
+  - [Orchestrated Mode](#orchestrated-mode-crobot-review)
+  - [MCP Server Mode](#mcp-server-mode-crobot-serve---mcp)
+  - [CLI Toolkit Mode](#cli-toolkit-mode-skill--slash-command)
+  - [Mode Comparison](#mode-comparison)
+- [Commands](#commands)
+  - [`export-pr-context`](#export-pr-context)
+  - [`get-file-snippet`](#get-file-snippet)
+  - [`list-bot-comments`](#list-bot-comments)
+  - [`apply-review-findings`](#apply-review-findings)
+  - [`review`](#review)
+  - [`models`](#models)
+  - [`serve`](#serve)
+  - [`review-instructions`](#review-instructions)
+  - [`export-skill`](#export-skill)
+  - [`export-philosophy`](#export-philosophy)
+  - [Global Flags](#global-flags)
+- [ReviewFinding Schema](#reviewfinding-schema)
+- [Configuration](#configuration)
+- [CI/CD Integration](#cicd-integration)
+- [Agent Integration](#agent-integration)
+- [Debugging](#debugging)
+- [Development](#development)
+- [License](#license)
 
 ---
 
@@ -130,13 +218,58 @@ platform: bitbucket
 bitbucket:
   workspace: myteam
   repo: my-service
-  # Credentials (user/token) cannot be set in config files.
-  # Use environment variables: CROBOT_BITBUCKET_USER, CROBOT_BITBUCKET_TOKEN
+  user: you@example.com
+  token: your-api-token
 ```
 
-> **Security note:** Credentials must be provided via environment variables
-> (`CROBOT_BITBUCKET_USER`, `CROBOT_BITBUCKET_TOKEN`). They cannot be loaded
-> from config files. For CI environments, use a secrets manager.
+> **Security note:** If you store credentials in the config file, ensure it is
+> not committed to version control. For CI environments, prefer environment
+> variables and a secrets manager. Add `.crobot.yaml` to your `.gitignore` if
+> using per-project config with credentials.
+
+---
+
+## Setting Up GitHub Authentication
+
+CRoBot authenticates with GitHub using a **Personal Access Token (PAT)**.
+
+### Step 1: Create a Personal Access Token
+
+1. Go to [GitHub Settings > Developer settings > Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+2. Click **Generate new token**
+3. Configure the token:
+   - **Name**: Give it a descriptive name (e.g. "CRoBot Code Reviews")
+   - **Expiration**: Set an appropriate expiry period
+   - **Repository access**: Select the repositories CRoBot should access
+4. Under **Repository permissions**, set:
+   - **Pull requests**: Read and write (to read PRs and post review comments)
+   - **Contents**: Read-only (to fetch file content at specific commits)
+5. Click **Generate token**
+6. **Copy the generated token immediately** -- it is only shown once
+
+> **Note:** Classic tokens also work. They need the `repo` scope.
+
+### Step 2: Configure CRoBot
+
+**Environment variables (recommended for CI):**
+
+```bash
+export CROBOT_GITHUB_TOKEN="ghp_your-token-here"
+export CROBOT_GITHUB_OWNER="your-org-or-username"
+export CROBOT_GITHUB_REPO="your-repo"
+```
+
+**Config file (recommended for local development):**
+
+```yaml
+# ~/.config/crobot/config.yaml
+platform: github
+
+github:
+  owner: your-org-or-username
+  repo: your-repo
+  token: ghp_your-token-here
+```
 
 ---
 
@@ -144,8 +277,9 @@ bitbucket:
 
 ### 1. Set Up Credentials
 
-Follow the [Bitbucket Authentication](#setting-up-bitbucket-authentication)
-steps above, then either export env vars or create a config file.
+Run `./scripts/setup.sh` for guided setup, or follow the
+[Bitbucket](#setting-up-bitbucket-authentication) /
+[GitHub](#setting-up-github-authentication) authentication steps manually.
 
 ### Option A: One-Command Review (Recommended)
 
@@ -157,8 +291,9 @@ The PR can be specified as a positional argument or via `--pr`. When a URL is
 provided, the workspace, repo, and PR number are extracted automatically:
 
 ```bash
-# Using a PR URL as a positional argument (simplest)
+# Using a PR URL as a positional argument (simplest — works with Bitbucket and GitHub)
 crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
+crobot review https://github.com/my-org/my-service/pull/42
 
 # Using a PR number (requires workspace/repo from config or flags)
 crobot review 42
@@ -225,6 +360,165 @@ crobot apply-review-findings --pr 42 --input findings.json --dry-run
 ```bash
 crobot apply-review-findings --pr 42 --input findings.json --write
 ```
+
+---
+
+## How It Works
+
+CRoBot supports three integration modes. Each divides responsibilities
+differently between CRoBot and the AI agent.
+
+### Orchestrated Mode (`crobot review`)
+
+CRoBot drives the entire review pipeline. The agent's only job is to analyze
+the code and return structured findings as JSON. CRoBot handles everything
+else: fetching PR data, delivering it to the agent, validating findings,
+deduplicating against prior comments, and posting.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  crobot review <pr-url> --write                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 1  [CRoBot]   Fetch PR context from platform          │
+│                      (metadata, changed files, diff hunks)  │
+│                                                             │
+│  Step 2  [CRoBot]   Build review prompt                     │
+│                      (methodology + philosophy + PR data)   │
+│                                                             │
+│  Step 3  [CRoBot]   Spawn agent subprocess (ACP handshake) │
+│                                                             │
+│  Step 4  [CRoBot]   Send prompt to agent                    │
+│                                                             │
+│  Step 5  [Agent]    Read diff from prompt                   │
+│                      Read full files from disk for context  │
+│                                                             │
+│  Step 6  [Agent]    Output JSON array of ReviewFindings     │
+│                                                             │
+│  Step 7  [CRoBot]   Parse findings from agent response      │
+│                                                             │
+│  Step 8  [CRoBot]   Review engine:                          │
+│                      - Validate findings against diff       │
+│                      - Deduplicate against existing comments │
+│                      - Enforce max-comments / severity       │
+│                                                             │
+│  Step 9  [CRoBot]   Post inline comments (or dry-run)       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The agent receives the full PR context in the prompt and does not need to call
+any CRoBot commands or tools. It may optionally call `list_bot_comments` to
+check for prior reviews, but must never post findings itself -- CRoBot handles
+that.
+
+### MCP Server Mode (`crobot serve --mcp`)
+
+CRoBot runs as a passive tool server. The agent drives the entire workflow by
+discovering and calling CRoBot's MCP tools. The full review methodology is
+delivered to the agent automatically on connection via the MCP instructions
+field -- no separate setup step is needed.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  crobot serve --mcp  (stdio transport)                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 1  [CRoBot]   Start MCP server, register 4 tools     │
+│                      Deliver review methodology via         │
+│                      MCP instructions on connect            │
+│                                                             │
+│  Step 2  [Agent]    Connect as MCP client                   │
+│                      Receive tools + instructions           │
+│                                                             │
+│  Step 3  [Agent]    Call export_pr_context                   │
+│          [CRoBot]   → Fetch from platform, return JSON     │
+│                                                             │
+│  Step 4  [Agent]    Read full files from disk for context   │
+│                                                             │
+│  Step 5  [Agent]    Call list_bot_comments                   │
+│          [CRoBot]   → Return existing comments             │
+│                                                             │
+│  Step 6  [Agent]    Formulate findings                      │
+│                                                             │
+│  Step 7  [Agent]    Call apply_review_findings (dry_run)     │
+│          [CRoBot]   → Validate, return results             │
+│                                                             │
+│  Step 8  [Agent]    Fix rejected findings if needed          │
+│                                                             │
+│  Step 9  [Agent]    Call apply_review_findings (write)       │
+│          [CRoBot]   → Post comments to platform            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The agent is in control. CRoBot is a tool provider that handles platform API
+calls, validation, and deduplication on behalf of the agent.
+
+### CLI Toolkit Mode (skill / slash command)
+
+The agent uses CRoBot's CLI commands via shell access. A skill file bootstraps
+the workflow by telling the agent to first load the review methodology via
+`crobot review-instructions`, then follow the step-by-step workflow.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  /review-pr <pr-url>  (or manual invocation)                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 1  [Skill]    Tell agent to load instructions         │
+│                                                             │
+│  Step 2  [Agent]    Run: crobot review-instructions         │
+│          [CRoBot]   → Print methodology to stdout          │
+│                                                             │
+│  Step 3  [Agent]    Run: crobot export-pr-context --pr N    │
+│          [CRoBot]   → Fetch from platform, print JSON      │
+│                                                             │
+│  Step 4  [Agent]    Read full files from disk for context   │
+│                                                             │
+│  Step 5  [Agent]    Run: crobot list-bot-comments --pr N    │
+│          [CRoBot]   → Print existing comments              │
+│                                                             │
+│  Step 6  [Agent]    Formulate findings, save to JSON file   │
+│                                                             │
+│  Step 7  [Agent]    Run: crobot apply-review-findings       │
+│                          --dry-run --input findings.json    │
+│          [CRoBot]   → Validate, print results              │
+│                                                             │
+│  Step 8  [Agent]    Fix rejected findings if needed          │
+│                                                             │
+│  Step 9  [Agent]    Run: crobot apply-review-findings       │
+│                          --write --input findings.json      │
+│          [CRoBot]   → Post comments to platform            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The agent is in control, using shell commands instead of MCP tools. The skill
+provides the entry point; `crobot review-instructions` provides the
+methodology.
+
+### Mode Comparison
+
+|                          | Orchestrated (`review`) | MCP Server (`serve`)       | CLI Toolkit (skill)        |
+|--------------------------|-------------------------|----------------------------|----------------------------|
+| **Who orchestrates**     | CRoBot                  | Agent                      | Agent                      |
+| **Who fetches PR data**  | CRoBot                  | Agent (via MCP tool)       | Agent (via CLI)            |
+| **Who analyzes code**    | Agent                   | Agent                      | Agent                      |
+| **Who validates**        | CRoBot                  | Agent (dry-run tool)       | Agent (dry-run CLI)        |
+| **Who posts comments**   | CRoBot                  | Agent (write tool)         | Agent (write CLI)          |
+| **Agent output**         | JSON text               | MCP tool calls             | Shell commands             |
+| **CRoBot's role**        | Orchestrator            | Tool server                | CLI toolkit                |
+| **Setup needed**         | Agent config            | `.mcp.json`                | `crobot export-skill`      |
+| **Best for**             | CI/CD, automation       | Interactive sessions       | Custom agent workflows     |
+
+> **Warning: Use one mode at a time.** Each mode assumes it owns the review
+> workflow. If the agent has access to both the orchestrated mode (via
+> `crobot review`) and CRoBot's MCP tools simultaneously, it may attempt to
+> post findings through MCP while CRoBot also posts them from the orchestrated
+> pipeline -- resulting in duplicate comments or conflicting behavior. When
+> using `crobot review`, ensure the CRoBot MCP server is not also configured
+> in the agent's MCP settings for the same project.
 
 ---
 
@@ -431,6 +725,56 @@ This is the CLI counterpart to the MCP server's built-in instructions. MCP
 agents receive these instructions automatically on connection; CLI agents
 should run this command first.
 
+### `export-skill`
+
+Exports the CRoBot review skill for an AI agent. The skill teaches agents the
+full code review workflow via a slash command.
+
+```bash
+# Print to stdout
+crobot export-skill
+
+# Install for a specific agent
+crobot export-skill --agent claude-code
+
+# Install globally (home directory)
+crobot export-skill --agent claude-code --global
+```
+
+| Flag      | Type   | Required | Default | Description                                            |
+|-----------|--------|----------|---------|--------------------------------------------------------|
+| `--agent` | string | no       |         | Target agent: `claude-code`, `codex`, `opencode`, `generic` |
+| `--global`| bool   | no       | `false` | Install to home directory (available across all projects)   |
+
+### `export-philosophy`
+
+Exports the default review philosophy to a file for customization. Override what
+CRoBot focuses on during reviews by editing the exported file.
+
+```bash
+# Print default philosophy to stdout
+crobot export-philosophy
+
+# Save to local project override
+crobot export-philosophy --local
+
+# Save to global override
+crobot export-philosophy --global
+```
+
+| Flag       | Type | Required | Default | Description                                         |
+|------------|------|----------|---------|-----------------------------------------------------|
+| `--local`  | bool | no       | `false` | Write to `.crobot-philosophy.md` in current directory |
+| `--global` | bool | no       | `false` | Write to `~/.config/crobot/review-philosophy.md`     |
+
+Philosophy is resolved in this order (first found wins):
+1. `--review-philosophy` flag on `crobot review`
+2. `review.philosophy_path` in config file
+3. `CROBOT_REVIEW_PHILOSOPHY` env var
+4. `.crobot-philosophy.md` in current directory
+5. `~/.config/crobot/review-philosophy.md`
+6. Built-in default
+
 ### Global Flags
 
 | Flag              | Type   | Default | Description                          |
@@ -466,7 +810,7 @@ should run this command first.
 | `severity`    | string | yes      | `"info"`, `"warning"`, or `"error"`               |
 | `category`    | string | yes      | e.g. `"security"`, `"bug"`, `"performance"`       |
 | `message`     | string | yes      | Human-readable explanation                         |
-| `suggestion`  | string | no       | Suggested code fix                                 |
+| `suggestion`  | string | no       | Replacement code (valid code only, applied verbatim) |
 | `fingerprint` | string | no       | Leave empty for auto-generation                    |
 
 **Severity levels** (highest to lowest):
@@ -510,10 +854,21 @@ bitbucket:
   # Default repository slug. Avoids passing --repo on every command.
   repo: my-service
 
-  # Credentials (user and token) CANNOT be set in config files (yaml:"-").
-  # They must be provided via environment variables:
-  #   CROBOT_BITBUCKET_USER  -- Atlassian account email (or "x-bitbucket-api-token-auth")
-  #   CROBOT_BITBUCKET_TOKEN -- Bitbucket API token
+  # Credentials can be set here, via env vars, or CLI flags.
+  # For CI, prefer environment variables (CROBOT_BITBUCKET_USER, CROBOT_BITBUCKET_TOKEN).
+  user: you@example.com
+  token: your-api-token
+
+# GitHub-specific settings (used when platform: github).
+github:
+  # Repository owner (user or organization).
+  owner: my-org
+
+  # Default repository name.
+  repo: my-service
+
+  # GitHub personal access token (fine-grained or classic).
+  token: ghp_your-token-here
 
 # Review behaviour settings.
 review:
@@ -573,6 +928,9 @@ Environment variables override config file values.
 | `CROBOT_BITBUCKET_REPO`        | Bitbucket repository slug                        |              |
 | `CROBOT_BITBUCKET_USER`        | Bitbucket username/email for API auth            |              |
 | `CROBOT_BITBUCKET_TOKEN`       | Bitbucket API token                              |              |
+| `CROBOT_GITHUB_OWNER`          | GitHub repository owner (user or org)            |              |
+| `CROBOT_GITHUB_REPO`           | GitHub repository name                           |              |
+| `CROBOT_GITHUB_TOKEN`          | GitHub personal access token                     |              |
 | `CROBOT_MAX_COMMENTS`          | Max comments per run                             | `25`         |
 | `CROBOT_DRY_RUN`               | Default dry-run mode (`true`, `1`, `yes`)        | `true`       |
 | `CROBOT_AGENT`                 | Default agent name for `crobot review`           |              |
@@ -585,8 +943,7 @@ Environment variables override config file values.
 
 ### Recommended Setup
 
-**For local development** -- use a global config file with defaults and set
-credentials via environment variables:
+**For local development** -- use a global config file with defaults:
 
 ```yaml
 # ~/.config/crobot/config.yaml
@@ -594,7 +951,8 @@ platform: bitbucket
 
 bitbucket:
   workspace: myteam
-  # Credentials must be set via env vars: CROBOT_BITBUCKET_USER, CROBOT_BITBUCKET_TOKEN
+  user: you@example.com
+  token: your-api-token
 ```
 
 Then add a per-repo `.crobot.yaml` to set the repository:
@@ -763,19 +1121,86 @@ The MCP server delivers the full review methodology (finding schema, workflow,
 severity guidelines, rules) to the agent automatically on connection via the
 MCP instructions field.
 
-### CLI Agents
+### CLI Agents (Skill / Slash Command)
 
-For agents using CLI commands, CRoBot ships a built-in review prompt via the
-`review-instructions` command. The agent runs it first to receive the review
-methodology, then follows the workflow:
+For agents using CLI commands, CRoBot includes a built-in review skill that you
+can install with a single command. The skill teaches the agent the full review
+workflow: load instructions, perform the review (with multi-agent parallelism
+when possible), and post findings.
+
+```bash
+# Install for Claude Code (current project)
+crobot export-skill --agent claude-code
+
+# Install for Claude Code (globally, all projects)
+crobot export-skill --agent claude-code --global
+
+# Install for other agents
+crobot export-skill --agent codex
+crobot export-skill --agent opencode
+crobot export-skill --agent generic
+
+# Print skill to stdout (inspect or pipe)
+crobot export-skill
+```
+
+| Agent          | Install Path                                    |
+|----------------|-------------------------------------------------|
+| `claude-code`  | `.claude/skills/review-pr/SKILL.md`             |
+| `codex`        | `.codex/skills/review-pr/SKILL.md`              |
+| `opencode`     | `.opencode/skills/review-pr/SKILL.md`           |
+| `generic`      | `.agents/skills/review-pr.md`                   |
+
+Once installed, use the `/review-pr <pr-url-or-number>` slash command in your
+agent session. The skill instructs the agent to:
+
+1. Run `crobot review-instructions` to load the review methodology
+2. Perform the review (spawning specialist sub-agents when possible)
+3. Dry-run findings with `crobot apply-review-findings --dry-run`, then post
+   with `--write`
+
+The underlying review instructions are also available directly:
 
 ```bash
 crobot review-instructions   # agent reads this output, then follows it
 ```
 
-A sample skill is included at `.agents/skills/review-pr.md`. Copy it to your
-project to enable the `/review-pr <number>` slash command, which instructs the
-agent to fetch and follow the CRoBot review instructions automatically.
+---
+
+## Debugging
+
+Use the `--verbose` (`-v`) flag to enable debug logging. CRoBot writes debug
+output to stderr, so it won't interfere with JSON output on stdout.
+
+```bash
+# Verbose output for any command
+crobot -v export-pr-context --pr 42
+crobot -v review https://github.com/org/repo/pull/42 --write
+
+# Capture debug logs to a file while keeping normal output
+crobot -v review 42 --write 2> debug.log
+
+# Capture everything (stdout + stderr) for a bug report
+crobot -v review 42 --show-agent-output 2>&1 | tee review-debug.log
+```
+
+Debug logging includes:
+- Config resolution (which config files loaded, platform selected)
+- HTTP requests to the platform API (URLs, status codes, retries)
+- Rate limit handling and backoff timing
+- Agent subprocess lifecycle (spawn, initialize, prompt, shutdown)
+- Finding validation and deduplication decisions
+- Comment posting results
+
+When reporting issues, include the full verbose output:
+
+```bash
+crobot -v <your-command> 2>&1 | tee debug.log
+# Attach debug.log to your issue at https://github.com/cristian-fleischer/crobot/issues
+```
+
+> **Note:** Verbose output may contain workspace/repo names and PR numbers but
+> never prints credentials (tokens or passwords).
 
 ---
 
@@ -794,6 +1219,38 @@ go build -o crobot ./cmd/crobot
 # Lint (requires golangci-lint)
 golangci-lint run
 ```
+
+### Releasing
+
+Releases are automated via [GoReleaser](https://goreleaser.com/) and GitHub
+Actions. Pushing a version tag triggers a workflow that runs tests, cross-compiles
+binaries for all platforms, and publishes a GitHub release.
+
+```bash
+# 1. Bump the version in internal/version/version.go
+# 2. Commit the change
+git add internal/version/version.go
+git commit -m "chore: bump version to 0.3.15-alpha"
+
+# 3. Tag and push
+git tag v0.3.15-alpha
+git push origin master v0.3.15-alpha
+```
+
+The release workflow builds binaries for:
+
+| OS      | Architectures  | Format |
+|---------|---------------|--------|
+| Linux   | amd64, arm64  | tar.gz |
+| macOS   | amd64, arm64  | tar.gz |
+| Windows | amd64, arm64  | zip    |
+
+Releases appear at
+[github.com/cristian-fleischer/crobot/releases](https://github.com/cristian-fleischer/crobot/releases)
+with checksums for verification.
+
+> **Note:** The version is defined in source (`internal/version/version.go`).
+> Do not override it with `-ldflags` during builds.
 
 ## License
 

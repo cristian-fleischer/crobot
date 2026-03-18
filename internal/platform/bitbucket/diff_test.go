@@ -206,7 +206,7 @@ rename to new_name.go
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Pure rename with no content changes — no @@ hunks
+	// Pure rename with no content changes -- no @@ hunks
 	if len(hunks) != 0 {
 		t.Errorf("expected 0 hunks for pure rename, got %d", len(hunks))
 	}
@@ -310,116 +310,6 @@ func TestParseDiff_HunkBodyContent(t *testing.T) {
 	}
 	if !contains(body, "+func new() {}") {
 		t.Errorf("body should contain added line, got: %q", body)
-	}
-}
-
-func TestParseHunkHeader(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		header   string
-		oldStart int
-		oldLines int
-		newStart int
-		newLines int
-		wantErr  bool
-	}{
-		{
-			name:     "standard",
-			header:   "@@ -10,5 +10,7 @@ function foo()",
-			oldStart: 10, oldLines: 5, newStart: 10, newLines: 7,
-		},
-		{
-			name:     "no context",
-			header:   "@@ -1,3 +1,3 @@",
-			oldStart: 1, oldLines: 3, newStart: 1, newLines: 3,
-		},
-		{
-			name:     "single line",
-			header:   "@@ -1 +1 @@",
-			oldStart: 1, oldLines: 1, newStart: 1, newLines: 1,
-		},
-		{
-			name:     "new file",
-			header:   "@@ -0,0 +1,5 @@",
-			oldStart: 0, oldLines: 0, newStart: 1, newLines: 5,
-		},
-		{
-			name:    "not a hunk",
-			header:  "not a hunk header",
-			wantErr: true,
-		},
-		{
-			name:    "missing closing @@",
-			header:  "@@ -1,3 +1,3 ",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			oldStart, oldLines, newStart, newLines, err := parseHunkHeader(tt.header)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if oldStart != tt.oldStart {
-				t.Errorf("oldStart: got %d, want %d", oldStart, tt.oldStart)
-			}
-			if oldLines != tt.oldLines {
-				t.Errorf("oldLines: got %d, want %d", oldLines, tt.oldLines)
-			}
-			if newStart != tt.newStart {
-				t.Errorf("newStart: got %d, want %d", newStart, tt.newStart)
-			}
-			if newLines != tt.newLines {
-				t.Errorf("newLines: got %d, want %d", newLines, tt.newLines)
-			}
-		})
-	}
-}
-
-func TestParseFilePath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		line string
-		want string
-	}{
-		{
-			name: "standard",
-			line: "diff --git a/src/auth.ts b/src/auth.ts",
-			want: "src/auth.ts",
-		},
-		{
-			name: "nested path",
-			line: "diff --git a/pkg/internal/handler.go b/pkg/internal/handler.go",
-			want: "pkg/internal/handler.go",
-		},
-		{
-			name: "root file",
-			line: "diff --git a/README.md b/README.md",
-			want: "README.md",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := parseFilePath(tt.line)
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
 	}
 }
 

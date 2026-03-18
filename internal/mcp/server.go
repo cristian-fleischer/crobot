@@ -25,11 +25,15 @@ type Server struct {
 // NewServer creates a new MCP server that exposes CRoBot tools.
 // The server uses the given platform for API calls and config for review settings.
 func NewServer(plat platform.Platform, cfg config.Config) (*Server, error) {
+	// Load custom review philosophy if configured.
+	philosophy, _ := config.LoadPhilosophy(cfg)
+	instructions := prompt.MCPInstructionsWithPhilosophy(philosophy)
+
 	mcpSrv := server.NewMCPServer(
 		"crobot",
 		version.Version,
 		server.WithToolCapabilities(false),
-		server.WithInstructions(prompt.MCPInstructions()),
+		server.WithInstructions(instructions),
 	)
 
 	// Register tools.

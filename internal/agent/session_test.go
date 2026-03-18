@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -544,9 +545,19 @@ func TestHandleNotification_VariousFormats(t *testing.T) {
 			wantText: "bar",
 		},
 		{
-			name:     "tool_call streamed dimmed",
-			params:   `{"sessionId":"s1","update":{"sessionUpdate":"tool_call"}}`,
-			wantText: "\033[2m> tool call\033[0m\n",
+			name:     "tool_call_update with input shows call line",
+			params:   `{"sessionId":"s1","update":{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","rawInput":{"path":"src/main.go"}}}`,
+			wantText: "\n\n\033[2m │ Read(path=src/main.go)\033[0m\n",
+		},
+		{
+			name:     "tool_call pending writes nothing",
+			params:   `{"sessionId":"s1","update":{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call","rawInput":{},"status":"pending"}}`,
+			wantText: "",
+		},
+		{
+			name:     "tool_call_update completed result only in debug",
+			params:   `{"sessionId":"s1","update":{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","status":"completed","rawOutput":"line1\nline2\nline3"}}`,
+			wantText: "",
 		},
 		{
 			name:     "usage_update ignored",
@@ -652,39 +663,45 @@ func TestExtractToolName(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		raw  string
-		want string
+		name       string
+		rawUpdate  string
+		rawContent string
+		want       string
 	}{
 		{
-			name: "array with name",
-			raw:  `[{"type":"tool_use","name":"Read"}]`,
-			want: "Read",
+			name:      "claude code _meta.claudeCode.toolName",
+			rawUpdate: `{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call","title":"Read File"}`,
+			want:      "Read",
 		},
 		{
-			name: "array with tool field",
-			raw:  `[{"type":"tool_use","tool":"Write"}]`,
-			want: "Write",
+			name:      "fallback to title",
+			rawUpdate: `{"sessionUpdate":"tool_call","title":"Read File"}`,
+			want:      "Read File",
 		},
 		{
-			name: "single object with name",
-			raw:  `{"type":"tool_use","name":"Grep"}`,
-			want: "Grep",
+			name:      "generic ACP name field",
+			rawUpdate: `{"sessionUpdate":"tool_call","name":"Write"}`,
+			want:      "Write",
 		},
 		{
-			name: "name takes priority over tool",
-			raw:  `[{"name":"Read","tool":"Write"}]`,
-			want: "Read",
+			name:      "generic ACP tool field",
+			rawUpdate: `{"sessionUpdate":"tool_call","tool":"Grep"}`,
+			want:      "Grep",
 		},
 		{
-			name: "empty content",
-			raw:  "",
-			want: "",
+			name:      "_meta takes priority over name",
+			rawUpdate: `{"_meta":{"claudeCode":{"toolName":"Read"}},"name":"SomethingElse"}`,
+			want:      "Read",
 		},
 		{
-			name: "no name or tool fields",
-			raw:  `[{"type":"tool_use"}]`,
-			want: "",
+			name:      "empty update",
+			rawUpdate: "",
+			want:      "",
+		},
+		{
+			name:      "no name fields at all",
+			rawUpdate: `{"sessionUpdate":"tool_call","status":"pending"}`,
+			want:      "",
 		},
 	}
 
@@ -692,12 +709,15 @@ func TestExtractToolName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var raw json.RawMessage
-			if tt.raw != "" {
-				raw = json.RawMessage(tt.raw)
+			var rawUpdate, rawContent json.RawMessage
+			if tt.rawUpdate != "" {
+				rawUpdate = json.RawMessage(tt.rawUpdate)
+			}
+			if tt.rawContent != "" {
+				rawContent = json.RawMessage(tt.rawContent)
 			}
 
-			got := extractToolName(raw)
+			got := extractToolName(rawUpdate, rawContent)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
@@ -705,38 +725,181 @@ func TestExtractToolName(t *testing.T) {
 	}
 }
 
-func TestStreamToolActivity(t *testing.T) {
+func TestToolCallStreaming(t *testing.T) {
 	t.Parallel()
 
-	t.Run("tool_call with name", func(t *testing.T) {
+	makeNotification := func(update string) json.RawMessage {
+		env := `{"sessionId":"test","update":` + update + `}`
+		return json.RawMessage(env)
+	}
+
+	t.Run("tool_call_update with input shows call line", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		s := &Session{streamWriter: &buf}
-		s.streamToolActivity("tool_call", "Read", nil)
-		want := "\033[2m> Read\033[0m\n"
-		if got := buf.String(); got != want {
-			t.Errorf("got %q, want %q", got, want)
+		params := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","rawInput":{"file_path":"src/main.go"}}`)
+		s.handleNotification("session/update", params)
+		got := buf.String()
+		if !strings.Contains(got, "│ Read(") {
+			t.Errorf("expected tool call line with name and pipe prefix, got %q", got)
+		}
+		if !strings.Contains(got, "file_path=src/main.go") {
+			t.Errorf("expected input in call line, got %q", got)
 		}
 	})
 
-	t.Run("tool_call without name", func(t *testing.T) {
+	t.Run("tool_call with pending status writes nothing", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		s := &Session{streamWriter: &buf}
-		s.streamToolActivity("tool_call", "", nil)
-		want := "\033[2m> tool call\033[0m\n"
-		if got := buf.String(); got != want {
-			t.Errorf("got %q, want %q", got, want)
-		}
-	})
-
-	t.Run("tool_call_update skipped", func(t *testing.T) {
-		t.Parallel()
-		var buf bytes.Buffer
-		s := &Session{streamWriter: &buf}
-		s.streamToolActivity("tool_call_update", "Read", nil)
+		params := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call","rawInput":{},"status":"pending"}`)
+		s.handleNotification("session/update", params)
 		if buf.Len() > 0 {
-			t.Errorf("tool_call_update should not write, got %q", buf.String())
+			t.Errorf("pending tool_call should not write, got %q", buf.String())
+		}
+	})
+
+	t.Run("tool_call_update with completed status writes nothing to stream", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		s := &Session{streamWriter: &buf}
+		params := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","status":"completed","rawOutput":"file contents here"}`)
+		s.handleNotification("session/update", params)
+		if buf.Len() > 0 {
+			t.Errorf("completed result should not write to stream (debug only), got %q", buf.String())
+		}
+	})
+
+	t.Run("all output is dimmed with pipe prefix", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		s := &Session{streamWriter: &buf}
+		params := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","rawInput":{"file_path":"a.go"}}`)
+		s.handleNotification("session/update", params)
+		got := buf.String()
+		if !strings.Contains(got, "\033[2m") || !strings.Contains(got, "\033[0m") {
+			t.Errorf("expected ANSI dim codes, got %q", got)
+		}
+		if !strings.Contains(got, "│") {
+			t.Errorf("expected pipe prefix, got %q", got)
+		}
+	})
+
+	t.Run("blank lines separate text and tool blocks", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		s := &Session{streamWriter: &buf}
+
+		// Send text first.
+		textParams := makeNotification(`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Hello"}}`)
+		s.handleNotification("session/update", textParams)
+
+		// Then a tool call with input — should have double blank line separator.
+		toolParams := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","rawInput":{"file_path":"a.go"}}`)
+		s.handleNotification("session/update", toolParams)
+
+		// Then text again — should have double blank line separator.
+		s.handleNotification("session/update", textParams)
+
+		got := buf.String()
+		// Text→tool: "Hello" + blank line + tool line
+		if !strings.Contains(got, "Hello\n\n") {
+			t.Errorf("expected blank line before tool block, got %q", got)
+		}
+		// Tool→text: tool line\n + blank line + "Hello"
+		if !strings.HasSuffix(got, "\n\nHello") {
+			t.Errorf("expected blank line after tool block, got %q", got)
+		}
+	})
+
+	t.Run("LLM newlines after tool block stripped for clean spacing", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		s := &Session{streamWriter: &buf}
+
+		// Tool call.
+		toolParams := makeNotification(`{"_meta":{"claudeCode":{"toolName":"Read"}},"sessionUpdate":"tool_call_update","rawInput":{"file_path":"a.go"}}`)
+		s.handleNotification("session/update", toolParams)
+
+		// LLM sends \n\n before text (typical paragraph break).
+		nlParams := makeNotification(`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"\n\n"}}`)
+		s.handleNotification("session/update", nlParams)
+
+		// Then actual text.
+		textParams := makeNotification(`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Next step."}}`)
+		s.handleNotification("session/update", textParams)
+
+		got := buf.String()
+		// Should have exactly one blank line between tool and text, not three.
+		if !strings.HasSuffix(got, "\n\nNext step.") {
+			t.Errorf("expected exactly one blank line after tool, got %q", got)
+		}
+		// Count newlines between tool line end and "Next"
+		idx := strings.Index(got, "Next")
+		before := got[:idx]
+		nlCount := strings.Count(before[strings.LastIndex(before, "\033[0m"):], "\n")
+		if nlCount != 2 {
+			t.Errorf("expected 2 newlines (=1 blank line) before text, got %d in %q", nlCount, got)
+		}
+	})
+}
+
+func TestCapLines(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		n     int
+		want  string
+	}{
+		{"under limit", "a\nb\nc", 5, "a\nb\nc"},
+		{"at limit", "a\nb\nc\nd\ne", 5, "a\nb\nc\nd\ne"},
+		{"over limit", "a\nb\nc\nd\ne\nf\ng", 5, "a\nb\nc\nd\ne\n..."},
+		{"single line", "hello", 5, "hello"},
+		{"empty", "", 5, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := capLines(tt.input, tt.n)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSummarizeJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("simple object", func(t *testing.T) {
+		t.Parallel()
+		got := summarizeJSON(json.RawMessage(`{"path":"src/main.go","line":42}`))
+		// Map ordering is not guaranteed, so check both fields are present.
+		if !strings.Contains(got, "path=src/main.go") {
+			t.Errorf("expected path=src/main.go, got %q", got)
+		}
+		if !strings.Contains(got, "line=42") {
+			t.Errorf("expected line=42, got %q", got)
+		}
+	})
+
+	t.Run("long value truncated", func(t *testing.T) {
+		t.Parallel()
+		long := strings.Repeat("x", 100)
+		got := summarizeJSON(json.RawMessage(`{"val":"` + long + `"}`))
+		if !strings.Contains(got, "...") {
+			t.Errorf("expected truncation, got %q", got)
+		}
+	})
+
+	t.Run("non-object", func(t *testing.T) {
+		t.Parallel()
+		got := summarizeJSON(json.RawMessage(`"just a string"`))
+		if got != "just a string" {
+			t.Errorf("got %q, want %q", got, "just a string")
 		}
 	})
 }

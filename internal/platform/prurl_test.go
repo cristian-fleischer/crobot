@@ -35,8 +35,68 @@ func TestParsePRURL(t *testing.T) {
 			want: &PRRequest{Workspace: "team", Repo: "repo", PRNumber: 7},
 		},
 		{
+			name: "github standard",
+			url:  "https://github.com/owner/repo/pull/123",
+			want: &PRRequest{Workspace: "owner", Repo: "repo", PRNumber: 123},
+		},
+		{
+			name: "github trailing slash",
+			url:  "https://github.com/owner/repo/pull/42/",
+			want: &PRRequest{Workspace: "owner", Repo: "repo", PRNumber: 42},
+		},
+		{
+			name: "github with extra path segments",
+			url:  "https://github.com/owner/repo/pull/42/files",
+			want: &PRRequest{Workspace: "owner", Repo: "repo", PRNumber: 42},
+		},
+		{
+			name: "github with fragment",
+			url:  "https://github.com/owner/repo/pull/42#discussion_r12345",
+			want: &PRRequest{Workspace: "owner", Repo: "repo", PRNumber: 42},
+		},
+		{
+			name:      "github wrong path format",
+			url:       "https://github.com/owner/repo/issues/42",
+			wantErr:   true,
+			errSubstr: "invalid GitHub PR URL",
+		},
+		{
+			name:      "github too few segments",
+			url:       "https://github.com/owner",
+			wantErr:   true,
+			errSubstr: "invalid GitHub PR URL",
+		},
+		{
+			name:      "github non-numeric PR",
+			url:       "https://github.com/owner/repo/pull/abc",
+			wantErr:   true,
+			errSubstr: "not a valid PR number",
+		},
+		{
+			name:      "github zero PR",
+			url:       "https://github.com/owner/repo/pull/0",
+			wantErr:   true,
+			errSubstr: "not a valid PR number",
+		},
+		{
+			name:      "github negative PR",
+			url:       "https://github.com/owner/repo/pull/-1",
+			wantErr:   true,
+			errSubstr: "not a valid PR number",
+		},
+		{
+			name: "github large PR number",
+			url:  "https://github.com/torvalds/linux/pull/99999",
+			want: &PRRequest{Workspace: "torvalds", Repo: "linux", PRNumber: 99999},
+		},
+		{
+			name: "github with query params",
+			url:  "https://github.com/org/repo/pull/7?diff=split",
+			want: &PRRequest{Workspace: "org", Repo: "repo", PRNumber: 7},
+		},
+		{
 			name:      "unsupported host",
-			url:       "https://github.com/owner/repo/pull/123",
+			url:       "https://gitlab.com/owner/repo/merge_requests/123",
 			wantErr:   true,
 			errSubstr: "unsupported PR URL host",
 		},
@@ -111,8 +171,11 @@ func TestIsPRURL(t *testing.T) {
 	}{
 		{"https://bitbucket.org/team/repo/pull-requests/42", true},
 		{"http://bitbucket.org/team/repo/pull-requests/42", true},
+		{"https://github.com/owner/repo/pull/123", true},
+		{"http://github.com/owner/repo/pull/123", true},
 		{"42", false},
 		{"bitbucket.org/team/repo/pull-requests/42", false},
+		{"github.com/owner/repo/pull/123", false},
 		{"", false},
 	}
 

@@ -65,9 +65,11 @@ type Session struct {
 	CurrentModel   string
 	AvailableModels []ModelInfo
 
-	// mu protects agentText during concurrent notification handling.
-	mu        sync.Mutex
-	agentText strings.Builder
+	// mu protects agentText and stream state during concurrent notification handling.
+	mu               sync.Mutex
+	agentText        strings.Builder
+	lastStreamWasTool bool
+	trailingNewlines  int // consecutive trailing newlines in the stream
 }
 
 // NewSession creates a new Session with the given configuration.
@@ -311,13 +313,11 @@ func (s *Session) handleNotification(method string, params json.RawMessage) {
 	}
 
 	// ACP session/update params are: {sessionId, update: {sessionUpdate, content, ...}}
-	// content can be a single ContentBlock or an array of ContentBlock.
+	// The update object may contain additional fields (name, input, output)
+	// depending on the sessionUpdate type, so we capture it as raw JSON.
 	var envelope struct {
-		SessionID string `json:"sessionId"`
-		Update    struct {
-			SessionUpdate string          `json:"sessionUpdate"`
-			Content       json.RawMessage `json:"content"`
-		} `json:"update"`
+		SessionID string          `json:"sessionId"`
+		Update    json.RawMessage `json:"update"`
 		// Flat fallback for non-standard agents that send sessionUpdate at top level.
 		SessionUpdate string          `json:"sessionUpdate"`
 		Content       json.RawMessage `json:"content"`
@@ -330,15 +330,27 @@ func (s *Session) handleNotification(method string, params json.RawMessage) {
 		return
 	}
 
+	// Parse the update object to extract standard fields.
+	var update struct {
+		SessionUpdate string          `json:"sessionUpdate"`
+		Content       json.RawMessage `json:"content"`
+	}
+	if len(envelope.Update) > 0 {
+		_ = json.Unmarshal(envelope.Update, &update)
+	}
+
 	// Resolve the update — prefer the nested ACP format, fall back to flat.
-	sessionUpdate := envelope.Update.SessionUpdate
-	rawContent := envelope.Update.Content
+	sessionUpdate := update.SessionUpdate
+	rawContent := update.Content
+	// rawUpdate is the full update object for extracting tool details.
+	rawUpdate := envelope.Update
 	if sessionUpdate == "" {
 		sessionUpdate = envelope.SessionUpdate
 		rawContent = envelope.Content
+		rawUpdate = nil
 	}
 
-	slog.Debug("agent: session/update", "type", sessionUpdate, "content_len", len(rawContent))
+	slog.Debug("agent: session/update", "type", sessionUpdate, "content_len", len(rawContent), "raw_update", string(rawUpdate))
 
 	blocks := parseContent(rawContent)
 
@@ -355,15 +367,35 @@ func (s *Session) handleNotification(method string, params json.RawMessage) {
 			s.activityFunc("thinking...")
 		}
 		// Thought chunks — stream but don't accumulate as final text.
+		var thought string
 		for _, b := range blocks {
-			if b.Type == "text" && s.streamWriter != nil {
-				_, _ = fmt.Fprint(s.streamWriter, b.Text)
+			if b.Type == "text" {
+				thought += b.Text
 			}
 		}
+		if thought == "" {
+			return
+		}
+		s.mu.Lock()
+		if s.lastStreamWasTool {
+			display := strings.TrimLeft(thought, "\n")
+			if display == "" {
+				s.mu.Unlock()
+				return
+			}
+			s.ensureBlankLine()
+			s.lastStreamWasTool = false
+			s.writeStream(display)
+		} else {
+			s.writeStream(thought)
+		}
+		s.mu.Unlock()
 		return
 	case "tool_call", "tool_call_update":
-		// Extract tool name from content blocks or raw JSON.
-		toolName := extractToolName(rawContent)
+		toolName := extractToolName(rawUpdate, rawContent)
+		slog.Debug("agent: tool activity", "type", sessionUpdate, "tool", toolName)
+
+		// Activity indicator.
 		if s.activityFunc != nil {
 			if toolName != "" {
 				s.activityFunc("tool: " + toolName)
@@ -371,11 +403,34 @@ func (s *Session) handleNotification(method string, params json.RawMessage) {
 				s.activityFunc("using tool...")
 			}
 		}
-		// Stream tool activity to writer if configured.
-		if s.streamWriter != nil {
-			s.streamToolActivity(sessionUpdate, toolName, rawContent)
+
+		// Show tool call line when input becomes available.
+		input := extractToolInput(rawUpdate, rawContent)
+		if input != "" {
+			label := toolName
+			if label == "" {
+				label = "tool call"
+			}
+			s.mu.Lock()
+			if !s.lastStreamWasTool {
+				s.ensureBlankLine()
+				s.lastStreamWasTool = true
+			}
+			s.writeStream(fmt.Sprintf("%s │ %s(%s)%s\n", dimStart, label, input, dimEnd))
+			s.mu.Unlock()
 		}
-		slog.Debug("agent: tool activity", "type", sessionUpdate, "tool", toolName)
+
+		// Log tool results at debug level only (shown with -v).
+		output := extractToolOutput(rawUpdate, rawContent)
+		if output != "" {
+			output = strings.TrimSpace(output)
+			output = capLines(output, maxToolOutputLines)
+			slog.Debug("agent: tool output", "tool", toolName, "output", output)
+		}
+		return
+	case "tool_result":
+		// Legacy/generic ACP tool_result — unlikely from Claude Code agents.
+		slog.Debug("agent: tool result")
 		return
 	default:
 		// Legacy fallback for non-standard agents.
@@ -391,15 +446,26 @@ func (s *Session) handleNotification(method string, params json.RawMessage) {
 		return
 	}
 
-	// Accumulate agent text for the final result.
+	// Accumulate agent text (unmodified) for the final result.
 	s.mu.Lock()
 	s.agentText.WriteString(text)
-	s.mu.Unlock()
 
-	// Stream to writer if configured.
-	if s.streamWriter != nil {
-		_, _ = fmt.Fprint(s.streamWriter, text)
+	// Stream to writer — manage tool→text transition.
+	if s.lastStreamWasTool {
+		// Strip leading newlines from LLM text so we control spacing exactly.
+		display := strings.TrimLeft(text, "\n")
+		if display == "" {
+			// Chunk was pure newlines — keep flag, wait for real content.
+			s.mu.Unlock()
+			return
+		}
+		s.ensureBlankLine()
+		s.lastStreamWasTool = false
+		s.writeStream(display)
+	} else {
+		s.writeStream(text)
 	}
+	s.mu.Unlock()
 }
 
 // extractResponseText tries to extract text from a prompt response that
@@ -455,64 +521,180 @@ func extractResponseText(content, messages json.RawMessage, text string) string 
 	return ""
 }
 
-// extractToolName tries to pull a tool name from raw content JSON.
-// ACP tool_call content blocks may have type "tool_use" with a "name" field,
-// or the content may be a raw object with "tool" or "name" at the top level.
-func extractToolName(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-
-	// Try array of objects with name field.
-	var arr []struct {
-		Type  string `json:"type"`
-		Name  string `json:"name"`
-		Tool  string `json:"tool"`
-	}
-	if json.Unmarshal(raw, &arr) == nil {
-		for _, b := range arr {
-			if b.Name != "" {
-				return b.Name
-			}
-			if b.Tool != "" {
-				return b.Tool
-			}
+// extractToolName pulls the tool name from the update object.
+// Claude Code agents put it at _meta.claudeCode.toolName; the title field
+// is a human-readable fallback. Generic ACP agents may use top-level name/tool.
+func extractToolName(rawUpdate, rawContent json.RawMessage) string {
+	if len(rawUpdate) > 0 {
+		var u struct {
+			Meta struct {
+				ClaudeCode struct {
+					ToolName string `json:"toolName"`
+				} `json:"claudeCode"`
+			} `json:"_meta"`
+			Title string `json:"title"`
+			Name  string `json:"name"`
+			Tool  string `json:"tool"`
 		}
-	}
-
-	// Try single object.
-	var single struct {
-		Type  string `json:"type"`
-		Name  string `json:"name"`
-		Tool  string `json:"tool"`
-	}
-	if json.Unmarshal(raw, &single) == nil {
-		if single.Name != "" {
-			return single.Name
-		}
-		if single.Tool != "" {
-			return single.Tool
+		if json.Unmarshal(rawUpdate, &u) == nil {
+			if u.Meta.ClaudeCode.ToolName != "" {
+				return u.Meta.ClaudeCode.ToolName
+			}
+			if u.Name != "" {
+				return u.Name
+			}
+			if u.Tool != "" {
+				return u.Tool
+			}
+			if u.Title != "" {
+				return u.Title
+			}
 		}
 	}
 
 	return ""
 }
 
-// streamToolActivity writes dimmed tool activity info to the stream writer.
-func (s *Session) streamToolActivity(updateType, toolName string, raw json.RawMessage) {
-	if updateType == "tool_call_update" {
-		// Don't spam streaming updates for partial tool results.
+// extractToolInput pulls the tool input/arguments from the update object.
+// Claude Code agents use rawInput; generic ACP agents may use input.
+// Returns a compact summary string, or "" if no meaningful input found.
+func extractToolInput(rawUpdate, rawContent json.RawMessage) string {
+	if len(rawUpdate) > 0 {
+		var u struct {
+			RawInput json.RawMessage `json:"rawInput"`
+			Input    json.RawMessage `json:"input"`
+		}
+		if json.Unmarshal(rawUpdate, &u) == nil {
+			// Prefer rawInput (Claude Code), fall back to input (generic ACP).
+			for _, raw := range []json.RawMessage{u.RawInput, u.Input} {
+				if len(raw) > 0 && string(raw) != "{}" && string(raw) != "null" {
+					return summarizeJSON(raw)
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// extractToolOutput pulls tool result text from the update object.
+// Claude Code agents use rawOutput (string or JSON); generic agents may use output.
+func extractToolOutput(rawUpdate, rawContent json.RawMessage) string {
+	if len(rawUpdate) > 0 {
+		var u struct {
+			RawOutput json.RawMessage `json:"rawOutput"`
+			Output    json.RawMessage `json:"output"`
+			Status    string          `json:"status"`
+		}
+		if json.Unmarshal(rawUpdate, &u) == nil {
+			// Only extract output when the tool is done.
+			if u.Status != "completed" && u.Status != "failed" {
+				return ""
+			}
+			// Prefer rawOutput (Claude Code), fall back to output (generic).
+			for _, raw := range []json.RawMessage{u.RawOutput, u.Output} {
+				if len(raw) == 0 || string(raw) == "null" {
+					continue
+				}
+				// rawOutput can be a JSON string or structured object.
+				var s string
+				if json.Unmarshal(raw, &s) == nil {
+					return s
+				}
+				return string(raw)
+			}
+		}
+	}
+
+	return ""
+}
+
+// summarizeJSON returns a compact one-line summary of a JSON input object.
+// Shows key=value pairs, truncating long values.
+func summarizeJSON(raw json.RawMessage) string {
+	var m map[string]json.RawMessage
+	if json.Unmarshal(raw, &m) != nil {
+		// Not an object — try to unquote if it's a JSON string, otherwise show raw.
+		var str string
+		if json.Unmarshal(raw, &str) == nil {
+			if len(str) > 80 {
+				str = str[:80] + "..."
+			}
+			return str
+		}
+		s := strings.TrimSpace(string(raw))
+		if len(s) > 80 {
+			s = s[:80] + "..."
+		}
+		return s
+	}
+
+	var parts []string
+	for k, v := range m {
+		val := strings.TrimSpace(string(v))
+		// Unquote simple strings.
+		var str string
+		if json.Unmarshal(v, &str) == nil {
+			val = str
+		}
+		if len(val) > 60 {
+			val = val[:60] + "..."
+		}
+		parts = append(parts, k+"="+val)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// maxToolOutputLines is the maximum number of lines shown for tool results.
+const maxToolOutputLines = 5
+
+// capLines truncates text to at most n lines, appending "..." if truncated.
+func capLines(s string, n int) string {
+	lines := strings.SplitN(s, "\n", n+1)
+	if len(lines) <= n {
+		return s
+	}
+	return strings.Join(lines[:n], "\n") + "\n..."
+}
+
+// dim wraps text in ANSI dim escape codes.
+const dimStart = "\033[2m"
+const dimEnd = "\033[0m"
+
+// writeStream writes data to the stream writer and tracks trailing newlines.
+// Caller must hold s.mu.
+func (s *Session) writeStream(data string) {
+	if data == "" || s.streamWriter == nil {
 		return
 	}
-
-	label := "tool call"
-	if toolName != "" {
-		label = toolName
+	_, _ = fmt.Fprint(s.streamWriter, data)
+	// Count trailing newlines.
+	n := 0
+	for i := len(data) - 1; i >= 0; i-- {
+		if data[i] == '\n' {
+			n++
+		} else {
+			break
+		}
 	}
-
-	// Write a dimmed one-liner so it's visible but unobtrusive.
-	_, _ = fmt.Fprintf(s.streamWriter, "\033[2m> %s\033[0m\n", label)
+	if n == len(data) {
+		// Data is entirely newlines — add to running count.
+		s.trailingNewlines += n
+	} else {
+		s.trailingNewlines = n
+	}
 }
+
+// ensureBlankLine adds just enough newlines to produce one blank line in the
+// stream. Caller must hold s.mu.
+func (s *Session) ensureBlankLine() {
+	needed := 2 - s.trailingNewlines // 2 = end current line + 1 blank
+	if needed <= 0 {
+		return
+	}
+	s.writeStream(strings.Repeat("\n", needed))
+}
+
 
 // handleRequest routes incoming JSON-RPC requests from the agent subprocess.
 func (s *Session) handleRequest(ctx context.Context, method string, params json.RawMessage) (any, error) {
@@ -547,19 +729,28 @@ func (s *Session) handlePermission(ctx context.Context, params json.RawMessage) 
 		return nil, fmt.Errorf("agent: parsing permission request: %w", err)
 	}
 
-	// Auto-approve: select the first "allow" or "always_allow" option.
-	// If no such option exists, cancel the permission request.
+	slog.Debug("agent: permission request", "raw", string(params))
+	for i, opt := range req.Options {
+		slog.Debug("agent: permission option", "index", i, "kind", opt.Kind, "name", opt.Name, "optionId", opt.OptionID)
+	}
+
+	// Auto-approve: select the first allow-like option.
+	// Claude Code sends "allow_always" and "allow_once"; other agents may
+	// use "allow" or "always_allow". Accept any of these.
 	optionID := ""
 	for _, opt := range req.Options {
-		if opt.Kind == "allow" || opt.Kind == "always_allow" {
+		switch opt.Kind {
+		case "allow_always", "always_allow", "allow_once", "allow":
 			optionID = opt.OptionID
 			slog.Debug("agent: auto-approving permission", "kind", opt.Kind, "name", opt.Name, "optionId", opt.OptionID)
+		}
+		if optionID != "" {
 			break
 		}
 	}
 
 	if optionID == "" {
-		slog.Warn("agent: no allow/always_allow option found, cancelling permission request")
+		slog.Warn("agent: no allow/always_allow option found, cancelling permission request", "options_count", len(req.Options))
 		return map[string]any{
 			"outcome": map[string]string{
 				"outcome": "cancelled",

@@ -10,6 +10,7 @@ import (
 
 	// Register platform implementations via their init() functions.
 	_ "github.com/cristian-fleischer/crobot/internal/platform/bitbucket"
+	_ "github.com/cristian-fleischer/crobot/internal/platform/github"
 )
 
 // buildPlatform creates a Platform instance from the loaded config.
@@ -20,13 +21,24 @@ func buildPlatform(cfg config.Config) (platform.Platform, error) {
 }
 
 // resolveWorkspaceRepo applies config-based defaults for workspace and repo.
-// CLI flags take precedence; if empty, the corresponding config values are used.
+// CLI flags take precedence; if empty, the corresponding config values are
+// used based on the configured platform.
 func resolveWorkspaceRepo(workspace, repo string, cfg config.Config) (string, string) {
-	if workspace == "" {
-		workspace = cfg.Bitbucket.Workspace
-	}
-	if repo == "" {
-		repo = cfg.Bitbucket.Repo
+	switch cfg.Platform {
+	case "github":
+		if workspace == "" {
+			workspace = cfg.GitHub.Owner
+		}
+		if repo == "" {
+			repo = cfg.GitHub.Repo
+		}
+	default: // "bitbucket" and others
+		if workspace == "" {
+			workspace = cfg.Bitbucket.Workspace
+		}
+		if repo == "" {
+			repo = cfg.Bitbucket.Repo
+		}
 	}
 	return workspace, repo
 }

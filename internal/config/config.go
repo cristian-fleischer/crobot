@@ -26,6 +26,9 @@ type Config struct {
 	// Bitbucket holds Bitbucket-specific settings.
 	Bitbucket BitbucketConfig `yaml:"bitbucket"`
 
+	// GitHub holds GitHub-specific settings.
+	GitHub GitHubConfig `yaml:"github"`
+
 	// Review holds code-review behaviour settings.
 	Review ReviewConfig `yaml:"review"`
 
@@ -51,6 +54,18 @@ type BitbucketConfig struct {
 	Token string `yaml:"token"`
 }
 
+// GitHubConfig holds GitHub-specific connection settings.
+type GitHubConfig struct {
+	// Owner is the GitHub repository owner (user or organization).
+	Owner string `yaml:"owner"`
+
+	// Repo is the default GitHub repository name.
+	Repo string `yaml:"repo"`
+
+	// Token is the GitHub personal access token or app installation token.
+	Token string `yaml:"token"`
+}
+
 // ReviewConfig holds settings that control code-review behaviour.
 type ReviewConfig struct {
 	// MaxComments is the maximum number of review comments per run.
@@ -64,6 +79,12 @@ type ReviewConfig struct {
 
 	// SeverityThreshold is the minimum severity level to report (e.g. "warning", "error").
 	SeverityThreshold string `yaml:"severity_threshold"`
+
+	// PhilosophyPath is the path to a custom review philosophy markdown file.
+	// When set, it replaces the built-in "Review Philosophy" section of the
+	// review prompt. Resolution order: default < global config file <
+	// local config file < env var (CROBOT_REVIEW_PHILOSOPHY) < CLI flag.
+	PhilosophyPath string `yaml:"philosophy_path"`
 }
 
 // AgentConfig holds agent-runner settings (Phase 3).
@@ -206,6 +227,15 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 	if v, ok := lookupEnv("CROBOT_BITBUCKET_TOKEN"); ok {
 		cfg.Bitbucket.Token = v
 	}
+	if v, ok := lookupEnv("CROBOT_GITHUB_OWNER"); ok {
+		cfg.GitHub.Owner = v
+	}
+	if v, ok := lookupEnv("CROBOT_GITHUB_REPO"); ok {
+		cfg.GitHub.Repo = v
+	}
+	if v, ok := lookupEnv("CROBOT_GITHUB_TOKEN"); ok {
+		cfg.GitHub.Token = v
+	}
 	if v, ok := lookupEnv("CROBOT_MAX_COMMENTS"); ok {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.Review.MaxComments = n
@@ -213,6 +243,9 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 	}
 	if v, ok := lookupEnv("CROBOT_DRY_RUN"); ok {
 		cfg.Review.DryRun = parseBool(v)
+	}
+	if v, ok := lookupEnv("CROBOT_REVIEW_PHILOSOPHY"); ok {
+		cfg.Review.PhilosophyPath = v
 	}
 
 	// Phase 3 env vars.
@@ -245,6 +278,46 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 			cfg.AI.Providers[providerName] = p
 		}
 	}
+}
+
+// ResolvePhilosophyPath returns the path to the custom review philosophy file,
+// checking the standard locations if no explicit path is configured.
+// Resolution: explicit path > ~/.config/crobot/review-philosophy.md >
+// .crobot-philosophy.md (in repo root). Returns "" if no override is found.
+func ResolvePhilosophyPath(cfg Config) string {
+	// Explicit path from config/env/CLI wins.
+	if cfg.Review.PhilosophyPath != "" {
+		return cfg.Review.PhilosophyPath
+	}
+
+	// Check local (repo-root) override.
+	if _, err := os.Stat(".crobot-philosophy.md"); err == nil {
+		return ".crobot-philosophy.md"
+	}
+
+	// Check global override.
+	if home, err := os.UserHomeDir(); err == nil {
+		globalPath := filepath.Join(home, ".config", "crobot", "review-philosophy.md")
+		if _, err := os.Stat(globalPath); err == nil {
+			return globalPath
+		}
+	}
+
+	return ""
+}
+
+// LoadPhilosophy reads the custom review philosophy from the resolved path.
+// Returns the file contents, or "" if no custom philosophy is configured.
+func LoadPhilosophy(cfg Config) (string, error) {
+	path := ResolvePhilosophyPath(cfg)
+	if path == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading review philosophy %s: %w", path, err)
+	}
+	return string(data), nil
 }
 
 // parseBool interprets common boolean string representations.

@@ -191,7 +191,7 @@ Your output must be a JSON array of `ReviewFinding` objects:
 | `category`       | string   | yes      | Category label (e.g. `"security"`, `"performance"`, `"bug"`, `"style"`) |
 | `criteria`       | []string | no       | Failed quality criteria (e.g. `["Security", "Maintainability"]`) |
 | `message`        | string   | yes      | Human-readable explanation of the issue            |
-| `suggestion`     | string   | no       | Corrected replacement code; include for every finding whenever possible |
+| `suggestion`     | string   | no       | Replacement code only (no prose) — applied verbatim; include for every finding whenever possible |
 | `fingerprint`    | string   | no       | Unique identifier for deduplication; leave empty and CRoBot will auto-generate |
 
 ### Severity Guidelines
@@ -332,10 +332,11 @@ For each issue worth commenting on:
    not just the problem.
 
    - **Use the `suggestion` field** with the corrected replacement code. CRoBot
-     renders this as a fenced code block that the developer can apply directly.
-     The suggestion should contain only the replacement code for the lines at
-     the finding's location -- no surrounding context, no explanation, just
-     the fixed code.
+     renders this inside a ```` ```suggestion ```` block that the developer can
+     apply with one click. The suggestion **must contain only valid code or code
+     comments** — no prose, no explanations, no markdown, no natural language.
+     It is applied verbatim as a code replacement. Include only the replacement
+     code for the lines at the finding's location — no surrounding context.
 
      **Indentation matters.** The suggestion replaces the original line(s)
      verbatim. You must match the exact indentation (spaces/tabs) of the

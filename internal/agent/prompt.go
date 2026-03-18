@@ -11,29 +11,16 @@ import (
 )
 
 // BuildSystemPrompt returns the system-level instructions for the reviewing
-// agent. It uses the core review methodology (philosophy, schema, rules) but
-// replaces the MCP/CLI workflow with a self-contained ACP workflow since the
-// PR data is already provided in the prompt.
+// agent. It uses the core review methodology (philosophy, schema, rules) with
+// the ACP-specific workflow.
 func BuildSystemPrompt() string {
-	var b strings.Builder
+	return prompt.ACPInstructions()
+}
 
-	b.WriteString(prompt.CoreInstructions())
-
-	b.WriteString("\n\n## Workflow\n\n")
-	b.WriteString("The PR metadata, changed files, and full diff are provided below.\n")
-	b.WriteString("You do NOT need to fetch any data — everything you need is in this prompt.\n\n")
-	b.WriteString("1. Read the PR title and description to understand the intent.\n")
-	b.WriteString("2. Analyze each changed file's diff hunks.\n")
-	b.WriteString("3. If you have filesystem access, read full files for additional context.\n")
-	b.WriteString("4. Formulate findings with specific messages and remediation code.\n")
-	b.WriteString("5. Output your findings as described below.\n")
-
-	b.WriteString("\n\n## Output Format\n\n")
-	b.WriteString("You MUST output your review findings as a JSON array of ReviewFinding objects.\n")
-	b.WriteString("Output ONLY the JSON array — no surrounding text, no markdown fences.\n")
-	b.WriteString("If you find no issues, output an empty array: []\n")
-
-	return b.String()
+// BuildSystemPromptWithPhilosophy returns the system-level instructions with
+// a custom review philosophy replacing the built-in default.
+func BuildSystemPromptWithPhilosophy(philosophy string) string {
+	return prompt.ACPInstructionsWithPhilosophy(philosophy)
 }
 
 // BuildReviewPrompt formats the PR context into a review prompt for the agent.
@@ -110,6 +97,12 @@ func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) strin
 // prompts. The optional PRRequest provides workspace, repo, and PR number metadata.
 func BuildFullPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) string {
 	return BuildSystemPrompt() + "\n---\n\n" + BuildReviewPrompt(prCtx, ref)
+}
+
+// BuildFullPromptWithPhilosophy combines the system prompt (with custom
+// philosophy) and review prompt into a single string.
+func BuildFullPromptWithPhilosophy(prCtx *platform.PRContext, ref *platform.PRRequest, philosophy string) string {
+	return BuildSystemPromptWithPhilosophy(philosophy) + "\n---\n\n" + BuildReviewPrompt(prCtx, ref)
 }
 
 // groupHunksByFile groups diff hunks by their file path.

@@ -46,6 +46,8 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(newInstructionsCmd())
 	cmd.AddCommand(newReviewCmd())
 	cmd.AddCommand(newModelsCmd())
+	cmd.AddCommand(newPhilosophyCmd())
+	cmd.AddCommand(newSkillCmd())
 
 	return cmd
 }

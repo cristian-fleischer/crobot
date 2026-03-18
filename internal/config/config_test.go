@@ -243,6 +243,59 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name:       "GitHub YAML file",
+			globalPath: "github.yaml",
+			localPath:  "",
+			env:        nil,
+			check: func(t *testing.T, cfg Config) {
+				t.Helper()
+				if cfg.Platform != "github" {
+					t.Errorf("Platform = %q, want %q", cfg.Platform, "github")
+				}
+				if cfg.GitHub.Owner != "test-org" {
+					t.Errorf("GitHub.Owner = %q, want %q", cfg.GitHub.Owner, "test-org")
+				}
+				if cfg.GitHub.Repo != "test-repo" {
+					t.Errorf("GitHub.Repo = %q, want %q", cfg.GitHub.Repo, "test-repo")
+				}
+				if cfg.GitHub.Token != "ghp_test123" {
+					t.Errorf("GitHub.Token = %q, want %q", cfg.GitHub.Token, "ghp_test123")
+				}
+				if cfg.Review.MaxComments != 30 {
+					t.Errorf("MaxComments = %d, want %d", cfg.Review.MaxComments, 30)
+				}
+				if cfg.Review.DryRun != false {
+					t.Errorf("DryRun = %v, want false", cfg.Review.DryRun)
+				}
+			},
+		},
+		{
+			name:       "GitHub env vars override YAML file",
+			globalPath: "github.yaml",
+			localPath:  "",
+			env: map[string]string{
+				"CROBOT_GITHUB_OWNER": "override-org",
+				"CROBOT_GITHUB_REPO":  "override-repo",
+				"CROBOT_GITHUB_TOKEN": "ghp_override",
+			},
+			check: func(t *testing.T, cfg Config) {
+				t.Helper()
+				if cfg.GitHub.Owner != "override-org" {
+					t.Errorf("GitHub.Owner = %q, want %q", cfg.GitHub.Owner, "override-org")
+				}
+				if cfg.GitHub.Repo != "override-repo" {
+					t.Errorf("GitHub.Repo = %q, want %q", cfg.GitHub.Repo, "override-repo")
+				}
+				if cfg.GitHub.Token != "ghp_override" {
+					t.Errorf("GitHub.Token = %q, want %q", cfg.GitHub.Token, "ghp_override")
+				}
+				// Non-overridden values from file should persist
+				if cfg.Platform != "github" {
+					t.Errorf("Platform = %q, want %q", cfg.Platform, "github")
+				}
+			},
+		},
+		{
 			name:       "complete YAML with Phase 3/4 fields",
 			globalPath: "complete.yaml",
 			localPath:  "",
@@ -450,6 +503,40 @@ func TestEnvVarParsing(t *testing.T) {
 		}
 		if cfg.Bitbucket.Repo != "override-repo" {
 			t.Errorf("Repo = %q, want %q", cfg.Bitbucket.Repo, "override-repo")
+		}
+	})
+
+	t.Run("github credentials from env", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"CROBOT_GITHUB_TOKEN": "ghp_secret123",
+		}
+		cfg, err := Load("", "", envMap(env))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.GitHub.Token != "ghp_secret123" {
+			t.Errorf("Token = %q, want %q", cfg.GitHub.Token, "ghp_secret123")
+		}
+	})
+
+	t.Run("github owner and repo from env", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"CROBOT_GITHUB_OWNER": "env-owner",
+			"CROBOT_GITHUB_REPO":  "env-repo",
+		}
+		cfg, err := Load("", "", envMap(env))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.GitHub.Owner != "env-owner" {
+			t.Errorf("Owner = %q, want %q", cfg.GitHub.Owner, "env-owner")
+		}
+		if cfg.GitHub.Repo != "env-repo" {
+			t.Errorf("Repo = %q, want %q", cfg.GitHub.Repo, "env-repo")
 		}
 	})
 

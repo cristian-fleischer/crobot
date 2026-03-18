@@ -27,6 +27,7 @@ type ReviewOpts struct {
 	Config          config.Config
 	ModelID         string
 	Instructions    string
+	Philosophy      string
 	MaxComments     int
 	DryRun          bool
 	ShowAgentOutput bool
@@ -48,6 +49,7 @@ func newReviewCmd() *cobra.Command {
 		rawOutput       bool
 		instructions    string
 		agentCommand    string
+		philosophyFlag  string
 	)
 
 	cmd := &cobra.Command{
@@ -108,7 +110,14 @@ automatically, so --workspace and --repo are not needed.`,
 				return err
 			}
 
-			// 3. Build platform client.
+			// 3. Auto-detect platform from URL when applicable.
+			if platform.IsPRURL(prValue) {
+				if detected := platform.PlatformFromURL(prValue); detected != "" {
+					cfg.Platform = detected
+				}
+			}
+
+			// 4. Build platform client.
 			plat, err := buildPlatform(cfg)
 			if err != nil {
 				return fmt.Errorf("creating platform client: %w", err)
@@ -132,6 +141,15 @@ automatically, so --workspace and --repo are not needed.`,
 				modelID = cfg.Agent.Model
 			}
 
+			// 7. Resolve review philosophy: CLI flag > env > config > file convention > default.
+			if cmd.Flags().Changed("review-philosophy") {
+				cfg.Review.PhilosophyPath = philosophyFlag
+			}
+			philosophy, err := config.LoadPhilosophy(cfg)
+			if err != nil {
+				return fmt.Errorf("loading review philosophy: %w", err)
+			}
+
 			opts := ReviewOpts{
 				PRRequest:       *pr,
 				Platform:        plat,
@@ -139,6 +157,7 @@ automatically, so --workspace and --repo are not needed.`,
 				Config:          cfg,
 				ModelID:         modelID,
 				Instructions:    instructions,
+				Philosophy:      philosophy,
 				MaxComments:     mc,
 				DryRun:          isDryRun,
 				ShowAgentOutput: showAgentOutput,
@@ -170,6 +189,7 @@ automatically, so --workspace and --repo are not needed.`,
 	cmd.Flags().BoolVar(&showAgentOutput, "show-agent-output", false, "Show the agent's stderr output during the review")
 	cmd.Flags().BoolVar(&rawOutput, "raw", false, "Disable markdown formatting of agent output (use with --show-agent-output)")
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
+	cmd.Flags().StringVar(&philosophyFlag, "review-philosophy", "", "Path to a custom review philosophy markdown file")
 	return cmd
 }
 
@@ -189,8 +209,8 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 		return nil, fmt.Errorf("fetching PR context: %w", err)
 	}
 
-	// 2. Build review prompt.
-	prompt := agent.BuildFullPrompt(prCtx, &opts.PRRequest)
+	// 2. Build review prompt (with custom philosophy if provided).
+	prompt := agent.BuildFullPromptWithPhilosophy(prCtx, &opts.PRRequest, opts.Philosophy)
 	if opts.Instructions != "" {
 		prompt += "\n\n## Additional Instructions\n\n" + opts.Instructions + "\n"
 	}

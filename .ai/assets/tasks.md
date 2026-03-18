@@ -18,7 +18,7 @@
 - [x] P1.1.1 Initialize Go module (`go mod init github.com/cristian-fleischer/crobot`)
 - [x] P1.1.2 Create project directory structure (`cmd/crobot/`, `internal/`)
 - [x] P1.1.3 Add cobra dependency, create root command skeleton (`internal/cli/root.go`)
-- [x] P1.1.4 Add global flags: `--version`, `--help`, `--verbose`, `--output-format`
+- [x] P1.1.4 Add global flags: `--version`, `--help`, `--verbose`
 - [x] P1.1.5 Set up structured logging (stderr, with `--verbose` flag)
 - [x] P1.1.6 Create `cmd/crobot/main.go` entry point
 
@@ -39,7 +39,9 @@
   - [x] `ReviewFinding`, `InlineComment`, `Comment`
   - [x] `FileRequest`
 - [x] P1.3.3 Implement platform factory (`internal/platform/factory.go`)
+  - [x] Typed constructors with `config.Config` parameter
 - [x] P1.3.4 Add JSON validation for `ReviewFinding` input
+  - [x] Category validation (must not be empty)
 - [x] P1.3.5 Unit tests for shared types (serialization, validation)
 
 ### P1.4 Bitbucket Cloud Implementation
@@ -49,6 +51,8 @@
   - [x] Pagination helper (Bitbucket `next` URL pattern)
   - [x] Rate limit handling and retries with backoff
   - [x] Error mapping (Bitbucket errors -> structured Go errors)
+  - [x] URL path injection prevention via `url.PathEscape()`
+  - [x] SSRF protection on pagination URLs
 - [x] P1.4.2 `GetPRContext` (`internal/platform/bitbucket/pr.go`)
   - [x] Fetch PR metadata and normalize to `PRContext`
   - [x] Fetch diffstat for list of changed files
@@ -101,6 +105,8 @@
   - [x] Write mode (post comments, return results with IDs)
   - [x] Max comments cap with configurable limit
   - [x] Summary output (posted / skipped / failed counts)
+  - [x] `RunWithContext` method to avoid redundant API calls
+  - [x] `RenderedBody` included in posted comment results
   - [x] Unit tests
 
 ### P1.6 CLI Commands
@@ -141,7 +147,7 @@
 - [x] P1.7.4 CI pipeline
   - [x] GitHub Actions workflow: lint (`golangci-lint`), test (`go test ./...`), build
   - [x] Require all tests to pass before merge
-  - [x] Release workflow: goreleaser for multi-platform binaries
+  - [x] Release workflow: GoReleaser for multi-platform binaries
 
 ### P1.8 Agent Instruction Files
 
@@ -177,6 +183,7 @@
 - [x] P2.1.3 Implement tool call handler (`internal/mcp/handler.go`)
   - [x] Route MCP tool calls to existing internal functions
   - [x] Error mapping (internal errors -> MCP error responses)
+  - [x] Sanitized error messages via `toolError` helper
 
 ### P2.2 CLI Integration
 
@@ -185,6 +192,21 @@
   - [x] Wire config (platform credentials, review settings)
 - [x] P2.2.2 Create example `.mcp.json` config for Claude Code
 - [x] P2.2.3 Integration test: MCP tool call round-trip
+
+### P2.3 Shared Review Prompt
+
+- [x] P2.3.1 Embedded review instructions (`internal/prompt/`)
+  - [x] `core.md` — review methodology, finding schema, rules
+  - [x] `philosophy.md` — customizable review philosophy (what to comment on/skip)
+  - [x] `workflow_mcp.md` — MCP-specific workflow steps
+  - [x] `workflow_cli.md` — CLI-specific workflow steps
+  - [x] `workflow_acp.md` — ACP orchestrator workflow steps
+  - [x] `commands_cli.md` — CLI command reference for agents
+- [x] P2.3.2 `review-instructions` CLI command
+  - [x] Outputs full CLI instructions for agent consumption
+  - [x] Respects custom philosophy overrides
+- [x] P2.3.3 MCP server delivers instructions via `WithInstructions`
+  - [x] Respects custom philosophy overrides
 
 ---
 
@@ -197,45 +219,101 @@
 
 ### P3.1 ACP Client
 
-- [ ] P3.1.1 JSON-RPC 2.0 client over stdio (`internal/agent/client.go`)
-  - [ ] Spawn agent subprocess (configurable command + args)
-  - [ ] Read/write JSON-RPC messages over stdin/stdout
-  - [ ] Handle notifications and requests
-- [ ] P3.1.2 Session lifecycle (`internal/agent/session.go`)
-  - [ ] `initialize` handshake
-  - [ ] `session/new` to create session
-  - [ ] `session/prompt` to send review prompt
-  - [ ] `session/update` notification handling (streaming)
-  - [ ] Session cleanup and subprocess termination
+- [x] P3.1.1 JSON-RPC 2.0 client over stdio (`internal/agent/client.go`)
+  - [x] Spawn agent subprocess (configurable command + args)
+  - [x] Read/write JSON-RPC messages over stdin/stdout
+  - [x] Handle notifications and requests
+  - [x] Unit tests for message encoding/decoding
+- [x] P3.1.2 Session lifecycle (`internal/agent/session.go`)
+  - [x] `initialize` handshake
+  - [x] `session/new` to create session
+  - [x] `session/prompt` to send review prompt
+  - [x] `session/update` notification handling (streaming)
+  - [x] Session cleanup and subprocess termination
+  - [x] Permission request handling (secure: no auto-approve fallback)
+  - [x] Activity tracking via `ActivityFunc` callback
+  - [x] Model metadata extraction from session
+  - [x] Unit tests for session lifecycle
 
 ### P3.2 Filesystem Capability
 
-- [ ] P3.2.1 Read-only filesystem handler (`internal/agent/fs.go`)
-  - [ ] `fs/read_text_file`: backed by git checkout at PR head commit
-  - [ ] Auto-approve reads, auto-deny writes
-  - [ ] No `fs/write_text_file` or `terminal/*`
+- [x] P3.2.1 Read-only filesystem handler (`internal/agent/fs.go`)
+  - [x] `fs/read_text_file`: backed by git checkout at PR head commit
+  - [x] Auto-approve reads, auto-deny writes
+  - [x] No `fs/write_text_file` or `terminal/*`
+  - [x] Commit hash validation (4-40 lowercase hex chars)
+  - [x] Path traversal prevention
+  - [x] Unit tests for commit hash validation and fs operations
 
 ### P3.3 Prompt & Parsing
 
-- [ ] P3.3.1 Review prompt construction (`internal/agent/prompt.go`)
-  - [ ] System prompt with review guidelines
-  - [ ] PR context (diff, files, metadata) formatted for agent
-  - [ ] Output format instructions (`ReviewFinding[]` JSON)
-- [ ] P3.3.2 Finding extraction (`internal/agent/parse.go`)
-  - [ ] Parse agent response to extract `ReviewFinding[]` JSON
-  - [ ] Handle edge cases (markdown fences, extra text, etc.)
-  - [ ] Retry logic on parse failure
+- [x] P3.3.1 Review prompt construction (`internal/agent/prompt.go`)
+  - [x] System prompt with review guidelines (via `prompt.ACPInstructions()`)
+  - [x] PR context (diff, files, metadata) formatted for agent
+  - [x] Output format instructions (`ReviewFinding[]` JSON)
+  - [x] Custom philosophy support via `BuildFullPromptWithPhilosophy()`
+  - [x] Unit tests for prompt construction
+- [x] P3.3.2 Finding extraction (`internal/agent/parse.go`)
+  - [x] Parse agent response to extract `ReviewFinding[]` JSON
+  - [x] Handle edge cases (markdown fences, extra text, etc.)
+  - [x] Unit tests for parsing edge cases
 
 ### P3.4 CLI Integration
 
-- [ ] P3.4.1 Add `review` command (`internal/cli/review.go`)
-  - [ ] `--pr` flag (URL or number)
-  - [ ] `--agent` flag (selects ACP agent from config)
-  - [ ] `--dry-run` / `--write` flags
-  - [ ] Wire full flow: fetch -> spawn agent -> analyze -> review engine -> post
-- [ ] P3.4.2 Agent config loading from YAML
-- [ ] P3.4.3 Timeout handling (configurable, default 5 min)
-- [ ] P3.4.4 Integration tests with mock agent subprocess
+- [x] P3.4.1 Add `review` command (`internal/cli/review.go`)
+  - [x] `--pr` flag (URL or number, also as positional argument)
+  - [x] `--agent` flag (selects ACP agent from config)
+  - [x] `--agent-command` flag (bypasses config, runs arbitrary agent binary)
+  - [x] `--dry-run` / `--write` flags
+  - [x] `--model` flag (or `--model ask` for interactive selection)
+  - [x] `--instructions` flag for runtime prompt customization
+  - [x] `--review-philosophy` flag for custom review philosophy path
+  - [x] `--show-agent-output` flag for streaming agent stderr
+  - [x] `--raw` flag for unformatted agent output
+  - [x] Wire full flow: fetch -> spawn agent -> analyze -> review engine -> post
+  - [x] Unit tests for `resolvePRFlag` and flag handling
+- [x] P3.4.2 Agent config loading from YAML (`internal/agent/config.go`)
+  - [x] `resolveAgentConfig` helper shared between review and models commands
+  - [x] Unit tests for config resolution
+- [x] P3.4.3 Timeout handling (configurable, default 5 min)
+- [x] P3.4.4 Integration tests with mock agent subprocess
+  - [x] Full ACP lifecycle tests (initialize, session, prompt, extract findings)
+  - [x] Permission handling tests
+  - [x] Filesystem capability tests
+
+### P3.5 PR URL Parsing
+
+- [x] P3.5.1 PR URL parser (`internal/platform/prurl.go`)
+  - [x] Parse Bitbucket PR URLs to extract workspace/repo/number
+  - [x] `IsPRURL` helper for URL detection
+  - [x] Unit tests for various URL formats
+
+### P3.6 Terminal UI
+
+- [x] P3.6.1 Progress writer (`internal/cli/progress.go`)
+  - [x] Terminal scroll region with persistent status bar
+  - [x] Live stats: elapsed time, agent name/model, prompt/response sizes, activity
+  - [x] Markdown rendering of agent output via `mdterm` library
+  - [x] Clean teardown with summary line
+  - [x] Unit tests for formatting helpers
+- [x] P3.6.2 Interactive model selection (`internal/cli/review.go`)
+  - [x] `--model ask` presents available models for user selection
+  - [x] Accept model by number or ID
+- [x] P3.6.3 `models` command (`internal/cli/models.go`)
+  - [x] List available models from a running agent
+
+### P3.7 Customizable Review Philosophy
+
+- [x] P3.7.1 Split review philosophy from core instructions
+  - [x] `philosophy.md` — separate, embeddable, overridable
+  - [x] `core.md` — non-customizable contract (schema, rules, deep review)
+- [x] P3.7.2 Philosophy resolution (layered like config)
+  - [x] Built-in default < `~/.config/crobot/review-philosophy.md` < `.crobot-philosophy.md` < config `philosophy_path` < `CROBOT_REVIEW_PHILOSOPHY` env var < `--review-philosophy` CLI flag
+  - [x] `config.LoadPhilosophy()` and `config.ResolvePhilosophyPath()` helpers
+- [x] P3.7.3 `export-philosophy` command (`internal/cli/philosophy.go`)
+  - [x] Print to stdout, or write to `--global` / `--local` locations
+- [x] P3.7.4 All prompt functions support custom philosophy
+  - [x] `ACPInstructionsWithPhilosophy()`, `MCPInstructionsWithPhilosophy()`, `CLIInstructionsWithPhilosophy()`
 
 ---
 
@@ -352,7 +430,7 @@
 
 ### P5.3 CLI Integration
 
-- [ ] P5.3.1 Extend `review` command with `--provider` and `--model` flags
+- [ ] P5.3.1 Extend `review` command with `--provider` flag (reuses existing `--model` flag)
 - [ ] P5.3.2 Wire provider selection (config-driven + CLI override)
 - [ ] P5.3.3 Integration tests with recorded API responses
 
@@ -360,8 +438,23 @@
 
 ## Cross-Phase / Future
 
-- [ ] GitHub platform adapter (`internal/platform/github/`)
+- [x] GitHub platform adapter (`internal/platform/github/`)
+  - [x] HTTP client with Bearer token auth, rate-limit handling, Link header pagination
+  - [x] PR metadata + changed files + raw diff fetching (GetPRContext)
+  - [x] Inline comments: list/create/delete with LEFT/RIGHT side mapping
+  - [x] File content retrieval via raw Accept header
+  - [x] Shared diff parser extracted to `internal/platform/diff.go`
+  - [x] GitHub PR URL parsing in `prurl.go`
+  - [x] GitHubConfig + env vars (CROBOT_GITHUB_OWNER/REPO/TOKEN)
+  - [x] Factory registration + CLI wiring
+  - [x] Comprehensive test suite (76+ tests)
 - [ ] GitLab platform adapter (`internal/platform/gitlab/`)
-- [ ] Summary comment with overall review status
+- [x] Summary comment with overall review status
 - [ ] Webhook listener for automatic PR review triggers
 - [ ] Batch review mode (multiple PRs)
+- [ ] Multi-agent review panel (parallel agents with different focus areas)
+- [ ] Multi-pass reviews (`--review-depth quick|standard|deep`)
+- [ ] AST-aware diff parsing (tree-sitter)
+- [ ] PR comment fixer (`crobot fix-pr`)
+- [ ] Skill distribution (MCP Registry, SkillHub, agent-skill-creator)
+- [ ] Binary distribuition for orchestarted usecases (bitbucket pipes, etc.)

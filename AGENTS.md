@@ -55,7 +55,8 @@ Fields: `path` (string, required), `line` (int >0, required), `side` ("new" or
 "old", required), `severity` ("info"/"warning"/"error", required),
 `severity_score` (int 1-10, optional -- 0 or omit to hide), `category`
 (string, required), `criteria` ([]string, optional -- failed quality criteria),
-`message` (string, required), `suggestion` (string, optional), `fingerprint`
+`message` (string, required), `suggestion` (string, optional -- **valid code
+only**, no prose; applied verbatim as a code replacement), `fingerprint`
 (string, optional -- leave empty for auto-generation).
 
 ## Workflow

@@ -12,15 +12,33 @@
 
 </div>
 
-CRoBot is a local-first, open-source CLI for AI-powered code reviews on pull
-requests. Unlike other AI review tools, CRoBot doesn't lock you into a
-specific AI model, git platform, or workflow. You bring your own AI agent,
-connect to your git provider, and review code the way that works for your
-team — fully automated in CI, supervised through MCP, or fully custom via CLI.
+Local-first, open-source CLI for AI-powered code reviews.
+Bring your own AI agent, connect any git platform, review your way.
 
 ```bash
-# One command. Any AI agent. Any git platform.
 crobot review https://github.com/your-org/your-repo/pull/42 --write
+```
+
+---
+
+## Quick Start
+
+**Install** — run the setup wizard (installs binary + walks you through configuration):
+
+```bash
+curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
+```
+
+Or [install manually](https://github.com/cristian-fleischer/crobot/releases/latest).
+
+**Review:**
+
+```bash
+# AI review on a pull request
+crobot review https://github.com/your-org/repo/pull/42 --write --show-agent-output
+
+# Review local changes before pushing (no PR needed)
+crobot review --show-agent-output
 ```
 
 ---
@@ -69,50 +87,6 @@ their AI model, their platform, and their pricing. CRoBot is different.
 - **Single binary, local-first** — One Go binary, zero runtime dependencies.
   Your source code stays on your machine. Runs the same on a developer laptop
   and in CI.
-
----
-
-## Quick Start
-
-### 1. Install
-
-```bash
-# Recommended: interactive setup wizard (installs binary + configures everything)
-curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
-
-# Or download the binary directly
-OS=linux ARCH=amd64
-VERSION=$(curl -sS https://api.github.com/repos/cristian-fleischer/crobot/releases/latest | grep -oP '"tag_name":\s*"v?\K[^"]+')
-curl -sL "https://github.com/cristian-fleischer/crobot/releases/latest/download/crobot_${VERSION}_${OS}_${ARCH}.tar.gz" | tar xz
-sudo mv crobot /usr/local/bin/
-
-# Or install from source
-go install github.com/cristian-fleischer/crobot/cmd/crobot@latest
-```
-
-### 2. Configure
-
-```bash
-# Set your git platform credentials (or use the setup wizard above)
-export CROBOT_GITHUB_TOKEN="ghp_your-token"    # GitHub
-export CROBOT_BITBUCKET_TOKEN="your-token"     # or Bitbucket
-```
-
-### 3. Review
-
-```bash
-# Automated review — one command does everything
-crobot review https://github.com/your-org/repo/pull/42 --write
-
-# Review local changes before pushing (no PR needed)
-crobot review
-
-# Choose a different AI agent or model
-crobot review 42 --agent-command "gemini --experimental-acp" --model gemini-2.5-pro
-
-# Interactive model selection
-crobot review 42 --model ask
-```
 
 ---
 

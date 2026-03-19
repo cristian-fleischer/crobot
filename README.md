@@ -1,40 +1,92 @@
-# CRoBot
+<div align="center">
 
-AI-powered code review bot that posts inline comments on pull requests.
+# CRoBot - AI Code Reviews, Your Way
 
-CRoBot is a local-first CLI tool written in Go. It fetches PR data, validates
-AI-generated review findings against the actual diff, deduplicates against
-existing comments, and posts inline review comments. The same binary works on a
-developer's machine and in CI pipelines.
+**Choose your AI agent. Choose your git platform. Choose your workflow.**
+**Open-source CLI. No per-user fees, no vendor lock-in.**
 
-## Features
+[![Release](https://img.shields.io/github/v/release/cristian-fleischer/crobot?include_prereleases&sort=semver)](https://github.com/cristian-fleischer/crobot/releases/latest)
+[![Go](https://img.shields.io/github/go-mod/go-version/cristian-fleischer/crobot)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/cristian-fleischer/crobot?style=social)](https://github.com/cristian-fleischer/crobot/stargazers)
 
-- **One-command review**: `crobot review <pr-url>` spawns an AI agent, feeds it
-  the PR diff, and posts inline comments -- fully automated.
-- **Three integration modes**: Use CRoBot as an autonomous orchestrator, as an
-  MCP tool server for interactive agent sessions, or as a CLI toolkit for
-  maximum flexibility (see [Use Cases](#use-cases) below).
-- **Platform-agnostic**: Bitbucket Cloud and GitHub supported; GitLab planned.
-- **Agent-agnostic**: Works with any AI coding agent (Claude Code, Codex CLI,
-  OpenCode, Gemini, Copilot) or directly via AI provider APIs (planned).
-- **Safe by default**: Dry-run mode is the default. Use `--write` to post.
-- **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs.
-- **Diff-aware validation**: Only allows comments on lines actually changed in
-  the PR.
-- **Customizable review philosophy**: Export, edit, and override the review
-  focus to match your project's needs (see [Configuration](#configuration)).
-- **Formatted streaming output**: Agent output is rendered as formatted
-  markdown in the terminal with a live progress indicator.
-- **MCP server**: Expose all tools over the Model Context Protocol for direct
-  agent integration via stdio.
-- **Local pre-push review**: Review local changes before pushing with
-  `crobot review` (no PR required). Diffs all changes (committed, staged, and
-  unstaged) against a base branch and renders findings in the terminal.
-- **Single binary**: No runtime dependencies.
+</div>
 
-## Use Cases
+Local-first, open-source CLI for AI-powered code reviews.
+Bring your own AI agent, connect any git platform, review your way.
 
-CRoBot supports three integration modes, each suited to different workflows:
+```bash
+crobot review https://github.com/your-org/your-repo/pull/42 --write
+```
+
+---
+
+## Quick Start
+
+**Install** - run the setup wizard (installs binary + walks you through configuration):
+
+```bash
+curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
+```
+
+Or [install manually](https://github.com/cristian-fleischer/crobot/releases/latest).
+
+**Review:**
+
+```bash
+# AI review on a pull request
+crobot review https://github.com/your-org/repo/pull/42 --write --show-agent-output
+
+# Review local changes before pushing (no PR needed)
+crobot review --show-agent-output
+```
+
+---
+
+## Why CRoBot?
+
+Every other AI code review tool makes the same trade-off: they lock you into
+their AI model, their platform, and their pricing. CRoBot is different.
+
+| | CRoBot | CodeRabbit | Qodo Merge | GitHub Copilot | PR-Agent (OSS) |
+|---|---|---|---|---|---|
+| **AI model** | Any ACP-compatible agent (Claude, Gemini, Copilot, OpenCode, custom) | Proprietary | Proprietary | GitHub's model | BYO LLM (API only) |
+| **Git platform** | Bitbucket, GitHub (GitLab soon) | GitHub, GitLab, Bitbucket, Azure DevOps | GitHub, GitLab, Bitbucket | GitHub only | GitHub, GitLab, Bitbucket |
+| **Workflow** | Automated (CI), supervised (MCP), or custom (CLI) | Automated only | Automated only | Automated only | Automated only |
+| **Pricing** | Free (use your existing AI subscriptions) | $12-30/user/month | $30-45/user/month | $10-39/user/month (bundled) | Free (LLM API costs) |
+| **Self-hosted** | Yes (single binary) | Enterprise only ($15K+/mo) | Enterprise only | No | Yes (Docker) |
+| **Protocol** | ACP + MCP native | Proprietary | Proprietary | Proprietary | No ACP/MCP support |
+| **Maintained** | Active | Active | Active | Active | Legacy (community-maintained) |
+
+### What makes CRoBot unique
+
+- **Agent-agnostic.** Use Claude Code, Gemini CLI, Codex, OpenCode, or any
+  [ACP](https://github.com/anthropics/agent-protocol)-compatible agent. Switch
+  models with a flag: `--agent-command "gemini --experimental-acp"`. No
+  proprietary AI. You use your existing subscriptions and API keys.
+
+- **Platform-agnostic.** Bitbucket Cloud and GitHub supported today. GitLab
+  is coming. One tool for all your repositories, regardless of hosting.
+
+- **Workflow-agnostic.** Three integration modes:
+  - **Orchestrated**: `crobot review <url> --write` - fully automated, perfect for CI/CD
+  - **Interactive**: MCP server mode - your AI agent calls CRoBot tools while you guide the review
+  - **Toolkit**: CLI commands + agent skills - full control over every step
+
+- **No per-user fees.** CRoBot is free and open source. You pay only for the
+  AI provider you already use (your Anthropic API key, Google AI subscription,
+  etc.). No vendor markup, no seat-based pricing.
+
+- **Customizable review philosophy.** Export, edit, and override the review
+  prompt to match your project's standards: `crobot export-philosophy --local`.
+
+- **Single binary, local-first.** One Go binary, zero runtime dependencies.
+  Your source code stays on your machine. Runs the same on a developer laptop
+  and in CI.
+
+---
+
+## Three Integration Modes
 
 ### Orchestrated (`crobot review`)
 
@@ -45,8 +97,7 @@ agent, collects findings, and posts comments. No human interaction required.
 crobot review https://bitbucket.org/team/repo/pull-requests/42 --write
 ```
 
-**Best for:** CI/CD pipelines, automated review on every PR, hands-off
-workflows where reviews should happen without human intervention.
+**Best for:** CI/CD pipelines, automated review on every PR, hands-off workflows.
 
 ### Interactive (MCP Server)
 
@@ -57,84 +108,61 @@ etc.) discovers CRoBot's tools and the human guides the review interactively.
 { "mcpServers": { "crobot": { "command": "crobot", "args": ["serve", "--mcp"] } } }
 ```
 
-**Best for:** Interactive development sessions where you want to review PRs
-conversationally, ask follow-up questions, iterate on findings, or combine code
-review with other agent tasks.
+**Best for:** Interactive sessions where you review PRs conversationally, ask
+follow-up questions, and iterate on findings.
 
-### Toolkit (CLI Commands)
+### Toolkit (CLI + Agent Skills)
 
-The agent (or a human) calls individual CRoBot commands
-(`export-pr-context`, `apply-review-findings`, etc.) as discrete steps. Install
-a skill to teach the agent the workflow automatically.
+The agent calls individual CRoBot commands as discrete steps. Install a skill
+to teach the agent the workflow automatically.
 
 ```bash
-# Install the review skill for your agent
-crobot export-skill --agent claude-code
-
+crobot export-skill --agent claude-code    # Install skill
 # Then use /review-pr <url> in your agent session
 ```
 
-**Best for:** Custom agent workflows, agents that use shell commands (via
-skills/slash commands), scenarios where you need full control over each step.
+**Best for:** Custom agent workflows, maximum control over each step.
 
-## Installation
+---
 
-### Quick Setup (Recommended)
+## Features
 
-Run the interactive setup wizard from your project directory. It installs the
-latest CRoBot binary (if missing), then walks you through platform credentials,
-usage modes, agent configuration, and review settings — generating config
-files, `.mcp.json`, and printing next steps. Re-runnable; existing values are
-loaded as defaults.
-
-```bash
-curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
-```
-
-### From Releases
-
-Download the latest binary from the
-[Releases](https://github.com/cristian-fleischer/crobot/releases/latest) page,
-or use the CLI:
-
-```bash
-# Adjust OS (linux/darwin) and ARCH (amd64/arm64) as needed
-OS=linux ARCH=amd64
-VERSION=$(curl -sS https://api.github.com/repos/cristian-fleischer/crobot/releases/latest | grep -oP '"tag_name":\s*"v?\K[^"]+')
-curl -sL "https://github.com/cristian-fleischer/crobot/releases/latest/download/crobot_${VERSION}_${OS}_${ARCH}.tar.gz" | tar xz
-sudo mv crobot /usr/local/bin/
-```
-
-### From Source
-
-```bash
-go install github.com/cristian-fleischer/crobot/cmd/crobot@latest
-```
-
-### Build from Source
-
-```bash
-git clone https://github.com/cristian-fleischer/crobot.git
-cd crobot
-go build -o crobot ./cmd/crobot
-```
+- **One-command review**: `crobot review <pr-url>` - fully automated
+  end-to-end AI code review
+- **Three integration modes**: Orchestrated, MCP server, or CLI toolkit
+- **Platform-agnostic**: Bitbucket Cloud and GitHub; GitLab planned
+- **Agent-agnostic**: Works with any ACP-compatible AI agent (Claude Code,
+  Gemini CLI, Codex, OpenCode, Copilot)
+- **Safe by default**: Dry-run is the default; use `--write` to post
+- **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs
+- **Diff-aware validation**: Only comments on lines actually changed in the PR
+- **Customizable review philosophy**: Export, edit, and override what the AI
+  focuses on
+- **Formatted streaming output**: Rendered markdown in the terminal with live
+  progress
+- **MCP server**: Expose all tools over Model Context Protocol for direct agent
+  integration
+- **Local pre-push review**: Review local changes before pushing (`crobot
+  review` with no PR)
+- **Single binary**: No runtime dependencies, one Go binary for all platforms
 
 > **Built with Claude Code.** CRoBot was developed largely through pair
 > programming with [Claude Code](https://claude.ai/code), Anthropic's AI
-> coding agent. From architecture to implementation to code reviews, Claude
-> Code has been an integral collaborator throughout this project. The
-> [`.ai/`](.ai/) folder contains planning artifacts (architecture plan, task
-> breakdown, implementation prompts) created during the design phase — also in
-> collaboration with Claude.
+> coding agent. The [`.ai/`](.ai/) folder contains planning artifacts created
+> during the design phase.
+
+---
+
+# Documentation
+
+Detailed reference documentation for all CRoBot commands, configuration, and
+integrations.
 
 ## Table of Contents
 
-- [Features](#features)
-- [Use Cases](#use-cases)
-- [Installation](#installation)
 - [Setting Up Bitbucket Authentication](#setting-up-bitbucket-authentication)
 - [Setting Up GitHub Authentication](#setting-up-github-authentication)
-- [Quickstart](#quickstart)
+- [Quickstart (Detailed)](#quickstart)
 - [How It Works](#how-it-works)
   - [Orchestrated Mode](#orchestrated-mode-crobot-review)
   - [MCP Server Mode](#mcp-server-mode-crobot-serve---mcp)
@@ -298,7 +326,7 @@ The PR can be specified as a positional argument or via `--pr`. When a URL is
 provided, the workspace, repo, and PR number are extracted automatically:
 
 ```bash
-# Using a PR URL as a positional argument (simplest — works with Bitbucket and GitHub)
+# Using a PR URL as a positional argument (simplest, works with Bitbucket and GitHub)
 crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
 crobot review https://github.com/my-org/my-service/pull/42
 
@@ -638,7 +666,7 @@ crobot review
 # Review local changes against a different base branch
 crobot review --base main
 
-# Using a PR URL (simplest — workspace and repo deduced from the URL)
+# Using a PR URL (simplest, workspace and repo deduced from the URL)
 crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
 
 # Using a PR number (requires workspace/repo from config or flags)
@@ -1270,6 +1298,19 @@ with checksums for verification.
 
 > **Note:** The version is defined in source (`internal/version/version.go`).
 > Do not override it with `-ldflags` during builds.
+
+---
+
+## Contributing
+
+CRoBot is open source and contributions are welcome! If you find CRoBot useful,
+please consider giving it a star on GitHub. It helps others discover the
+project.
+
+[![Star on GitHub](https://img.shields.io/github/stars/cristian-fleischer/crobot?style=social)](https://github.com/cristian-fleischer/crobot)
+
+Report bugs and request features at
+[github.com/cristian-fleischer/crobot/issues](https://github.com/cristian-fleischer/crobot/issues).
 
 ## License
 

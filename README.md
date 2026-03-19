@@ -66,23 +66,6 @@ their AI model, their platform, and their pricing. CRoBot is different.
   Your source code stays on your machine. Runs the same on a developer laptop
   and in CI.
 
-### CRoBot vs PR-Agent
-
-[PR-Agent](https://github.com/qodo-ai/pr-agent) is the closest open-source
-alternative, but there are key differences:
-
-- PR-Agent is now a **"community-maintained legacy project"** — Qodo's focus
-  has shifted to their commercial [Qodo Merge](https://www.qodo.ai/) product,
-  with premium features (💎) reserved for the paid tier
-- PR-Agent has **no ACP or MCP support** — it can't natively integrate with
-  modern AI coding agents like Claude Code or Gemini CLI
-- PR-Agent offers **only automated mode** — no interactive/supervised reviews,
-  no MCP server, no agent skills
-- CRoBot is a **single Go binary** vs PR-Agent's Python stack with Docker
-  requirements
-- CRoBot gives you **full control over the review philosophy** — export, edit,
-  and override what the AI focuses on
-
 ---
 
 ## Quick Start

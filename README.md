@@ -62,6 +62,10 @@ their AI model, their platform, and their pricing. CRoBot is different.
   AI provider you already use (your Anthropic API key, Google AI subscription,
   etc.). No vendor markup, no seat-based pricing.
 
+- **Customizable review philosophy** — Export, edit, and override the review
+  prompt to match your project's standards. Focus on security, performance,
+  style — whatever matters to your team: `crobot export-philosophy --local`.
+
 - **Single binary, local-first** — One Go binary, zero runtime dependencies.
   Your source code stays on your machine. Runs the same on a developer laptop
   and in CI.

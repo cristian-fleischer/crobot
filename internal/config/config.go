@@ -255,6 +255,11 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 	if v, ok := lookupEnv("CROBOT_MODEL"); ok {
 		cfg.Agent.Model = v
 	}
+	if v, ok := lookupEnv("CROBOT_TIMEOUT"); ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Agent.Timeout = n
+		}
+	}
 
 	// Phase 4 env vars.
 	if v, ok := lookupEnv("CROBOT_AI_PROVIDER"); ok {

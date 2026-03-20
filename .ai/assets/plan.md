@@ -114,7 +114,7 @@ modifying lower layers.
        v          v          v
  +-----------+ +---------+ +---------+
  | Bitbucket | | GitHub  | | GitLab  |
- | Cloud     | | (future)| | (future)|
+ | Cloud     | |         | | (future)|
  +-----------+ +---------+ +---------+
 
 +--------------------------------------+
@@ -875,6 +875,8 @@ CRoBot/
       platform.go                   # Platform interface         (P1)
       types.go                      # shared types               (P1)
       factory.go                    # NewPlatform() factory      (P1)
+      diffsize.go                   # diff stats, low-value classification
+      diffwriter.go                 # write per-file diffs + index to disk
       bitbucket/
         client.go                   # HTTP client, auth          (P1)
         pr.go                       # GetPRContext               (P1)
@@ -883,7 +885,7 @@ CRoBot/
         file.go                     # file content retrieval     (P1)
       local/
         provider.go                 # local git diff provider    (P3.8)
-      # github/                     # future
+      github/                       # GitHub adapter
       # gitlab/                     # future
 
     review/
@@ -964,15 +966,17 @@ The `review` command orchestrates:
 ```
 1. Resolve PR (parse URL or use --workspace/--repo/--pr flags)
 2. Fetch PRContext from platform
-3. Analyze (one of):
-   a. ACP agent (--agent): spawn subprocess, ACP handshake, prompt, parse
+3. Write per-file diffs to .crobot/diffs-<run-id>/ with index
+4. Analyze (one of):
+   a. ACP agent (--agent): spawn subprocess, ACP handshake, prompt with diff dir, parse
    b. Native SDK (--sdk): spawn bridge, use SDK features, stream findings
    c. AI provider (--provider): call API directly, parse response
-4. Validate findings against diff
-5. Deduplicate against existing bot comments
-6. Render comments
-7. Post (--dry-run or --write)
-8. Output summary JSON
+5. Validate findings against diff
+6. Deduplicate against existing bot comments
+7. Render comments
+8. Post (--dry-run or --write)
+9. Clean up diff directory
+10. Output summary JSON
 ```
 
 Steps 4-8 are identical regardless of the analysis backend. The analysis layer

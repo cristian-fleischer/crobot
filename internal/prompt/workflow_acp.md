@@ -1,13 +1,17 @@
 ## Workflow
 
-The review metadata, changed files, and full diff are provided below.
-You do NOT need to fetch any data — everything you need is in this prompt.
+The PR metadata and changed files list are provided below. Per-file diffs
+are written to disk at `.crobot/diffs-<run-id>/`.
 
-1. Read the PR title and description to understand the intent.
-2. Analyze each changed file's diff hunks.
-3. If you have filesystem access, read full files for additional context.
-4. Formulate findings with specific messages and remediation code.
-5. Output your findings as described below.
+1. Read `.crobot/diffs-<run-id>/.crobot-index.md` for the file list with sizes.
+2. Read individual file diffs at `.crobot/diffs-<run-id>/<file-path>`.
+3. Read the PR title and description to understand the intent.
+4. For deeper context, read full source files with filesystem access.
+5. Formulate findings with specific messages and remediation code.
+6. Output your findings as described below.
+
+Focus on source code files. Lock files, generated code, and vendor
+dependencies are flagged in the index -- review only if relevant.
 
 ### Prior review comments
 

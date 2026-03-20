@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cristian-fleischer/crobot/internal/agent"
 	"github.com/cristian-fleischer/crobot/internal/config"
@@ -47,6 +48,7 @@ func newReviewCmd() *cobra.Command {
 		dryRun          bool
 		write           bool
 		maxComments     int
+		timeoutSecs     int
 		showAgentOutput bool
 		rawOutput       bool
 		instructions    string
@@ -156,6 +158,11 @@ always runs as dry-run and renders findings to the terminal.`,
 				return fmt.Errorf("resolving agent config: %w", err)
 			}
 
+			// 5b. Override timeout if --timeout flag was provided.
+			if cmd.Flags().Changed("timeout") && timeoutSecs > 0 {
+				agentCfg.Timeout = time.Duration(timeoutSecs) * time.Second
+			}
+
 			// 6. Resolve max comments: CLI flag > config default.
 			mc := cfg.Review.MaxComments
 			if cmd.Flags().Changed("max-comments") {
@@ -214,6 +221,7 @@ always runs as dry-run and renders findings to the terminal.`,
 	cmd.Flags().StringVar(&workspace, "workspace", "", "Workspace or organization slug")
 	cmd.Flags().StringVar(&repo, "repo", "", "Repository slug")
 	cmd.Flags().IntVar(&maxComments, "max-comments", 0, "Maximum number of comments to post (0 = unlimited; omit to use config default)")
+	cmd.Flags().IntVarP(&timeoutSecs, "timeout", "t", 0, "Agent timeout in seconds (0 = use config default, currently 10m)")
 	cmd.Flags().BoolVar(&showAgentOutput, "show-agent-output", false, "Show the agent's stderr output during the review")
 	cmd.Flags().BoolVar(&rawOutput, "raw", false, "Disable markdown formatting of agent output (use with --show-agent-output)")
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
@@ -238,8 +246,19 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 		return nil, fmt.Errorf("fetching PR context: %w", err)
 	}
 
+	// 1b. Write per-file diffs to disk for incremental agent consumption.
+	if err := platform.CleanupStaleDiffDirs(".crobot"); err != nil {
+		slog.Warn("failed to clean stale diff dirs", "error", err)
+	}
+	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
+	diffDir := platform.NewDiffDir(".crobot")
+	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
+		return nil, fmt.Errorf("writing diff files: %w", err)
+	}
+	defer platform.CleanupDiffDir(diffDir)
+
 	// 2. Build review prompt (with custom philosophy if provided).
-	prompt := agent.BuildFullPromptWithPhilosophy(prCtx, &opts.PRRequest, opts.Philosophy)
+	prompt := agent.BuildFullPromptWithPhilosophy(prCtx, &opts.PRRequest, opts.Philosophy, diffDir)
 	if opts.Instructions != "" {
 		prompt += "\n\n## Additional Instructions\n\n" + opts.Instructions + "\n"
 	}

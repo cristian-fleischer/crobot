@@ -3,6 +3,7 @@
 
 # Sensitive config and output files
 .crobot.yaml
+.crobot/
 findings.json
 *.env
 # Compiled mock agent binary (but not the source in testdata/)

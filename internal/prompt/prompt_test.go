@@ -111,14 +111,17 @@ func TestCLIInstructions_NotEmpty(t *testing.T) {
 	}
 }
 
-func TestCLIInstructions_LongerThanMCP(t *testing.T) {
+func TestCLIInstructions_ContainsCLICommandReference(t *testing.T) {
 	t.Parallel()
 
-	mcp := MCPInstructions()
 	cli := CLIInstructions()
+	mcp := MCPInstructions()
 
-	if len(cli) <= len(mcp) {
-		t.Errorf("CLI instructions (%d bytes) should be longer than MCP (%d bytes) due to command reference",
-			len(cli), len(mcp))
+	// CLI instructions should contain the CLI command reference that MCP lacks.
+	if !strings.Contains(cli, "CLI Commands") {
+		t.Error("CLI instructions missing 'CLI Commands' section")
+	}
+	if strings.Contains(mcp, "CLI Commands") {
+		t.Error("MCP instructions should not contain 'CLI Commands' section")
 	}
 }

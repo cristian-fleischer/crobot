@@ -410,37 +410,17 @@ the code and return structured findings as JSON. CRoBot handles everything
 else: fetching PR data, delivering it to the agent, validating findings,
 deduplicating against prior comments, and posting.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  crobot review <pr-url> --write                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Step 1  [CRoBot]   Fetch PR context from platform          │
-│                      (metadata, changed files, diff hunks)  │
-│                                                             │
-│  Step 2  [CRoBot]   Build review prompt                     │
-│                      (methodology + philosophy + PR data)   │
-│                                                             │
-│  Step 3  [CRoBot]   Spawn agent subprocess (ACP handshake) │
-│                                                             │
-│  Step 4  [CRoBot]   Send prompt to agent                    │
-│                                                             │
-│  Step 5  [Agent]    Read diff from prompt                   │
-│                      Read full files from disk for context  │
-│                                                             │
-│  Step 6  [Agent]    Output JSON array of ReviewFindings     │
-│                                                             │
-│  Step 7  [CRoBot]   Parse findings from agent response      │
-│                                                             │
-│  Step 8  [CRoBot]   Review engine:                          │
-│                      - Validate findings against diff       │
-│                      - Deduplicate against existing comments │
-│                      - Enforce max-comments / severity       │
-│                                                             │
-│  Step 9  [CRoBot]   Post inline comments (or dry-run)       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Step | Actor  | Action                                                                                                            |
+|------|--------|---------------------------------------------------------------------------------------------------------------------------|
+| 1    | CRoBot | Fetch PR context from platform (metadata, changed files, diff hunks)                                                      |
+| 2    | CRoBot | Build review prompt (methodology + philosophy + PR data)                                                                  |
+| 3    | CRoBot | Spawn agent subprocess (ACP handshake)                                                                                    |
+| 4    | CRoBot | Send prompt to agent                                                                                                      |
+| 5    | Agent  | Read diff from prompt; read full files from disk for context                                                              |
+| 6    | Agent  | Output JSON array of ReviewFindings                                                                                       |
+| 7    | CRoBot | Parse findings from agent response                                                                                        |
+| 8    | CRoBot | Review engine: validate findings against diff, deduplicate against existing comments, enforce max-comments / severity     |
+| 9    | CRoBot | Post inline comments (or dry-run)                                                                                         |
 
 The agent receives the full PR context in the prompt and does not need to call
 any CRoBot commands or tools. It may optionally call `list_bot_comments` to
@@ -454,38 +434,17 @@ discovering and calling CRoBot's MCP tools. The full review methodology is
 delivered to the agent automatically on connection via the MCP instructions
 field -- no separate setup step is needed.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  crobot serve --mcp  (stdio transport)                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Step 1  [CRoBot]   Start MCP server, register 4 tools     │
-│                      Deliver review methodology via         │
-│                      MCP instructions on connect            │
-│                                                             │
-│  Step 2  [Agent]    Connect as MCP client                   │
-│                      Receive tools + instructions           │
-│                                                             │
-│  Step 3  [Agent]    Call export_pr_context                   │
-│          [CRoBot]   → Fetch from platform, return JSON     │
-│                                                             │
-│  Step 4  [Agent]    Read full files from disk for context   │
-│                                                             │
-│  Step 5  [Agent]    Call list_bot_comments                   │
-│          [CRoBot]   → Return existing comments             │
-│                                                             │
-│  Step 6  [Agent]    Formulate findings                      │
-│                                                             │
-│  Step 7  [Agent]    Call apply_review_findings (dry_run)     │
-│          [CRoBot]   → Validate, return results             │
-│                                                             │
-│  Step 8  [Agent]    Fix rejected findings if needed          │
-│                                                             │
-│  Step 9  [Agent]    Call apply_review_findings (write)       │
-│          [CRoBot]   → Post comments to platform            │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Step | Actor           | Action                                                        |
+|------|-----------------|---------------------------------------------------------------|
+| 1    | CRoBot          | Start MCP server, register 4 tools; deliver review methodology via MCP instructions on connect |
+| 2    | Agent           | Connect as MCP client; receive tools + instructions           |
+| 3    | Agent / CRoBot  | Agent calls `export_pr_context`; CRoBot fetches from platform, returns JSON |
+| 4    | Agent           | Read full files from disk for context                         |
+| 5    | Agent / CRoBot  | Agent calls `list_bot_comments`; CRoBot returns existing comments |
+| 6    | Agent           | Formulate findings                                            |
+| 7    | Agent / CRoBot  | Agent calls `apply_review_findings` (dry_run); CRoBot validates, returns results |
+| 8    | Agent           | Fix rejected findings if needed                               |
+| 9    | Agent / CRoBot  | Agent calls `apply_review_findings` (write); CRoBot posts comments to platform |
 
 The agent is in control. CRoBot is a tool provider that handles platform API
 calls, validation, and deduplication on behalf of the agent.
@@ -496,38 +455,17 @@ The agent uses CRoBot's CLI commands via shell access. A skill file bootstraps
 the workflow by telling the agent to first load the review methodology via
 `crobot review-instructions`, then follow the step-by-step workflow.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  /review-pr <pr-url>  (or manual invocation)                │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Step 1  [Skill]    Tell agent to load instructions         │
-│                                                             │
-│  Step 2  [Agent]    Run: crobot review-instructions         │
-│          [CRoBot]   → Print methodology to stdout          │
-│                                                             │
-│  Step 3  [Agent]    Run: crobot export-pr-context --pr N    │
-│          [CRoBot]   → Fetch from platform, print JSON      │
-│                                                             │
-│  Step 4  [Agent]    Read full files from disk for context   │
-│                                                             │
-│  Step 5  [Agent]    Run: crobot list-bot-comments --pr N    │
-│          [CRoBot]   → Print existing comments              │
-│                                                             │
-│  Step 6  [Agent]    Formulate findings, save to JSON file   │
-│                                                             │
-│  Step 7  [Agent]    Run: crobot apply-review-findings       │
-│                          --dry-run --input findings.json    │
-│          [CRoBot]   → Validate, print results              │
-│                                                             │
-│  Step 8  [Agent]    Fix rejected findings if needed          │
-│                                                             │
-│  Step 9  [Agent]    Run: crobot apply-review-findings       │
-│                          --write --input findings.json      │
-│          [CRoBot]   → Post comments to platform            │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Step | Actor           | Action                                                        |
+|------|-----------------|---------------------------------------------------------------|
+| 1    | Skill           | Tell agent to load instructions                               |
+| 2    | Agent / CRoBot  | Agent runs `crobot review-instructions`; CRoBot prints methodology to stdout |
+| 3    | Agent / CRoBot  | Agent runs `crobot export-pr-context --pr N`; CRoBot fetches from platform, prints JSON |
+| 4    | Agent           | Read full files from disk for context                         |
+| 5    | Agent / CRoBot  | Agent runs `crobot list-bot-comments --pr N`; CRoBot prints existing comments |
+| 6    | Agent           | Formulate findings, save to JSON file                         |
+| 7    | Agent / CRoBot  | Agent runs `crobot apply-review-findings --dry-run --input findings.json`; CRoBot validates, prints results |
+| 8    | Agent           | Fix rejected findings if needed                               |
+| 9    | Agent / CRoBot  | Agent runs `crobot apply-review-findings --write --input findings.json`; CRoBot posts comments to platform |
 
 The agent is in control, using shell commands instead of MCP tools. The skill
 provides the entry point; `crobot review-instructions` provides the

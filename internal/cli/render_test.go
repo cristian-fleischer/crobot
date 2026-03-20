@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cristian-fleischer/crobot/internal/platform"
+	"github.com/cristian-fleischer/crobot/internal/review"
 )
 
 func TestExtractDiffContext(t *testing.T) {
@@ -120,6 +121,124 @@ func TestExtractDiffContext_LineNumbers(t *testing.T) {
 				t.Errorf("target Prefix = %q, want %q", l.Prefix, "+")
 			}
 		}
+	}
+}
+
+func TestExtractDiffContext_TargetNotInHunk(t *testing.T) {
+	// Hunk covers new lines 10-17, but we ask for line 15 which is within
+	// the hunk range yet might not match any parsed line (e.g., the hunk body
+	// doesn't have enough lines). After the #7 fix, this should return nil
+	// instead of all parsed lines.
+	hunks := []platform.DiffHunk{
+		{
+			Path:     "main.go",
+			OldStart: 10,
+			OldLines: 3,
+			NewStart: 10,
+			NewLines: 5,
+			Body:     " line10\n+line11\n+line12\n",
+		},
+	}
+
+	// Line 15 is within NewStart+NewLines range (10+5=15) but there's no
+	// line 15 in the hunk body. The function should find the hunk but not
+	// the target line, and return nil.
+	lines := extractDiffContext(14, "new", "main.go", hunks, 3)
+	if lines != nil {
+		t.Errorf("expected nil when target line not found in hunk body, got %d lines", len(lines))
+	}
+}
+
+func TestRenderFindings(t *testing.T) {
+	posted := []review.PostedComment{
+		{
+			Finding: platform.ReviewFinding{
+				Path:     "main.go",
+				Line:     13,
+				Side:     "new",
+				Severity: "warning",
+				Category: "bug",
+				Message:  "potential nil pointer",
+			},
+			CommentID:    "dry-run-1",
+			RenderedBody: "**warning** | bug\n\npotential nil pointer",
+		},
+		{
+			Finding: platform.ReviewFinding{
+				Path:     "util.go",
+				Line:     5,
+				Side:     "new",
+				Severity: "info",
+				Category: "style",
+				Message:  "consider renaming",
+			},
+			CommentID:    "dry-run-2",
+			RenderedBody: "**info** | style\n\nconsider renaming",
+		},
+	}
+
+	hunks := []platform.DiffHunk{
+		{
+			Path:     "main.go",
+			OldStart: 10,
+			OldLines: 7,
+			NewStart: 10,
+			NewLines: 8,
+			Body:     " line10\n line11\n line12\n-old13\n+new13\n+new14\n line15\n line16\n",
+		},
+		{
+			Path:     "util.go",
+			OldStart: 1,
+			OldLines: 5,
+			NewStart: 1,
+			NewLines: 6,
+			Body:     " line1\n line2\n line3\n line4\n+line5\n line6\n",
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderFindings(posted, hunks, &buf, true) // raw=true to skip mdterm
+	out := buf.String()
+
+	// Should contain the header with count.
+	if !strings.Contains(out, "REVIEW COMMENTS (2)") {
+		t.Errorf("expected header with count 2, got:\n%s", out)
+	}
+
+	// Should contain both file paths.
+	if !strings.Contains(out, "main.go") {
+		t.Error("output should contain main.go")
+	}
+	if !strings.Contains(out, "util.go") {
+		t.Error("output should contain util.go")
+	}
+
+	// Should contain the rendered bodies.
+	if !strings.Contains(out, "potential nil pointer") {
+		t.Error("output should contain first finding's body")
+	}
+	if !strings.Contains(out, "consider renaming") {
+		t.Error("output should contain second finding's body")
+	}
+
+	// Should contain separator between findings.
+	if !strings.Contains(out, "───") {
+		t.Error("output should contain separator between findings")
+	}
+
+	// Should contain footer.
+	if !strings.Contains(out, "END REVIEW COMMENTS") {
+		t.Error("output should contain footer")
+	}
+}
+
+func TestRenderFindings_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	RenderFindings(nil, nil, &buf, true)
+	out := buf.String()
+
+	if !strings.Contains(out, "REVIEW COMMENTS (0)") {
+		t.Errorf("expected header with count 0, got:\n%s", out)
 	}
 }
 

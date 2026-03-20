@@ -189,6 +189,60 @@ func TestBuildReviewPrompt_MultipleHunksSameFile(t *testing.T) {
 	}
 }
 
+func TestBuildReviewPrompt_LocalMode(t *testing.T) {
+	t.Parallel()
+
+	prCtx := &platform.PRContext{
+		Title:        "Local review: feature-branch",
+		Author:       "dev",
+		SourceBranch: "feature-branch",
+		TargetBranch: "master",
+		State:        "local",
+		Files: []platform.ChangedFile{
+			{Path: "main.go", Status: "modified"},
+		},
+		DiffHunks: []platform.DiffHunk{
+			{
+				Path:     "main.go",
+				OldStart: 1, OldLines: 3,
+				NewStart: 1, NewLines: 4,
+				Body: " package main\n-var x = 1\n+var x = 2\n+var y = 3\n",
+			},
+		},
+	}
+
+	ref := &platform.PRRequest{Workspace: "local", Repo: "my-repo", PRNumber: 0}
+	prompt := BuildReviewPrompt(prCtx, ref)
+
+	// Should use local mode metadata, not PR metadata.
+	if !strings.Contains(prompt, "Local Review Metadata") {
+		t.Error("expected 'Local Review Metadata' header for PRNumber 0")
+	}
+	if strings.Contains(prompt, "PR Metadata") {
+		t.Error("should not contain 'PR Metadata' for local mode")
+	}
+	if !strings.Contains(prompt, "Local (pre-push review)") {
+		t.Error("expected local mode indicator")
+	}
+	if !strings.Contains(prompt, "my-repo") {
+		t.Error("expected repository name in metadata")
+	}
+	// Should NOT contain workspace or PR number fields.
+	if strings.Contains(prompt, "**Workspace**") {
+		t.Error("local mode should not show Workspace field")
+	}
+	if strings.Contains(prompt, "**PR Number**") {
+		t.Error("local mode should not show PR Number field")
+	}
+	// Standard fields should still be present.
+	if !strings.Contains(prompt, "feature-branch") {
+		t.Error("should contain source branch")
+	}
+	if !strings.Contains(prompt, "local") {
+		t.Error("should contain state")
+	}
+}
+
 func TestBuildFullPrompt(t *testing.T) {
 	t.Parallel()
 

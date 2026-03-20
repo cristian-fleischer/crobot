@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -501,6 +504,150 @@ func TestHandleApplyReviewFindings_DefaultDryRun(t *testing.T) {
 	}
 }
 
+// --- export_local_context handler tests (#14) ---
+
+func TestHandleExportLocalContext_Success(t *testing.T) {
+	// This test requires a real git repo because the local provider calls git.
+	dir := setupLocalTestRepo(t)
+
+	h := newTestHandler(&mockPlatform{})
+	result, err := h.handleExportLocalContext(t.Context(), makeRequest(map[string]any{
+		"base_branch": "master",
+		"repo_dir":    dir,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		text := resultText(t, result)
+		t.Fatalf("expected success, got error: %s", text)
+	}
+
+	text := resultText(t, result)
+
+	var prCtx platform.PRContext
+	if err := json.Unmarshal([]byte(text), &prCtx); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if prCtx.State != "local" {
+		t.Errorf("State = %q, want %q", prCtx.State, "local")
+	}
+	if prCtx.SourceBranch != "feature" {
+		t.Errorf("SourceBranch = %q, want %q", prCtx.SourceBranch, "feature")
+	}
+	if prCtx.TargetBranch != "master" {
+		t.Errorf("TargetBranch = %q, want %q", prCtx.TargetBranch, "master")
+	}
+	if len(prCtx.Files) == 0 {
+		t.Error("expected at least one changed file")
+	}
+}
+
+func TestHandleExportLocalContext_BadRepo(t *testing.T) {
+	h := newTestHandler(&mockPlatform{})
+	result, err := h.handleExportLocalContext(t.Context(), makeRequest(map[string]any{
+		"repo_dir": t.TempDir(), // empty dir, not a git repo
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected error for non-repo directory")
+	}
+	text := resultText(t, result)
+	if !strings.Contains(text, "failed to export local context") {
+		t.Errorf("error should contain sanitized message: %s", text)
+	}
+}
+
+func TestHandleExportLocalContext_BadBranch(t *testing.T) {
+	dir := setupLocalTestRepo(t)
+
+	h := newTestHandler(&mockPlatform{})
+	result, err := h.handleExportLocalContext(t.Context(), makeRequest(map[string]any{
+		"base_branch": "nonexistent-branch",
+		"repo_dir":    dir,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected error for bad base branch")
+	}
+	text := resultText(t, result)
+	if !strings.Contains(text, "failed to export local context") {
+		t.Errorf("error should contain sanitized message: %s", text)
+	}
+}
+
+func TestHandleExportLocalContext_Defaults(t *testing.T) {
+	dir := setupLocalTestRepo(t)
+
+	h := newTestHandler(&mockPlatform{})
+	// Don't provide base_branch or repo_dir — should use defaults.
+	// repo_dir defaults to "." which won't work from test dir, so just test base_branch default.
+	result, err := h.handleExportLocalContext(t.Context(), makeRequest(map[string]any{
+		"repo_dir": dir,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		text := resultText(t, result)
+		t.Fatalf("expected success with default base_branch, got error: %s", text)
+	}
+
+	text := resultText(t, result)
+	var prCtx platform.PRContext
+	if err := json.Unmarshal([]byte(text), &prCtx); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	// Default base_branch is "master", which is what setupLocalTestRepo creates.
+	if prCtx.TargetBranch != "master" {
+		t.Errorf("TargetBranch = %q, want %q (default)", prCtx.TargetBranch, "master")
+	}
+}
+
+// setupLocalTestRepo creates a temp git repo with a master branch and a feature
+// branch with changes, suitable for testing the local context handler.
+func setupLocalTestRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test",
+			"GIT_AUTHOR_EMAIL=test@test.com",
+			"GIT_COMMITTER_NAME=Test",
+			"GIT_COMMITTER_EMAIL=test@test.com",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %s\n%s", args, err, out)
+		}
+	}
+
+	run("init", "-b", "master")
+	run("config", "user.name", "Test")
+	run("config", "user.email", "test@test.com")
+	if err := os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "hello.txt")
+	run("commit", "-m", "initial")
+	run("checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello world\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "hello.txt")
+	run("commit", "-m", "modify hello")
+
+	return dir
+}
+
 func TestDispatch_UnknownTool(t *testing.T) {
 	t.Parallel()
 
@@ -564,6 +711,23 @@ func TestDispatch_RoutesToCorrectHandler(t *testing.T) {
 			// not detailed output — that's tested in individual handler tests.
 			_ = result
 		})
+	}
+}
+
+func TestDispatch_ExportLocalContextRoutes(t *testing.T) {
+	dir := setupLocalTestRepo(t)
+
+	h := newTestHandler(&mockPlatform{})
+	fn := h.dispatch("export_local_context")
+	result, err := fn(t.Context(), makeRequest(map[string]any{
+		"repo_dir": dir,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		text := resultText(t, result)
+		t.Fatalf("dispatch to export_local_context failed: %s", text)
 	}
 }
 

@@ -209,6 +209,17 @@ func TestCreateInlineComment_Error(t *testing.T) {
 	}
 }
 
+func TestDeleteComment_Error(t *testing.T) {
+	p := New("master", ".")
+	err := p.DeleteComment(context.Background(), prRequest(), "some-id")
+	if err == nil {
+		t.Fatal("expected error from DeleteComment in local mode")
+	}
+	if !containsString(err.Error(), "local mode does not support deleting comments") {
+		t.Errorf("unexpected error message: %q", err.Error())
+	}
+}
+
 func TestParseNameStatus(t *testing.T) {
 	tests := []struct {
 		name   string

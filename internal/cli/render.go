@@ -204,7 +204,7 @@ func extractDiffContext(line int, side, path string, hunks []platform.DiffHunk, 
 	}
 
 	if targetIdx < 0 || len(parsed) == 0 {
-		return parsed // return all if target not found
+		return nil
 	}
 
 	// Extract a window around the target.

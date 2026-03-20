@@ -8,7 +8,7 @@ import (
 )
 
 // DefaultTimeout is the default agent execution timeout.
-const DefaultTimeout = 5 * time.Minute
+const DefaultTimeout = 10 * time.Minute
 
 // RunConfig holds the resolved configuration for running an ACP agent.
 type RunConfig struct {

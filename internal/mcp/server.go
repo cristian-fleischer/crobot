@@ -36,6 +36,11 @@ func NewServer(plat platform.Platform, cfg config.Config) (*Server, error) {
 		server.WithInstructions(instructions),
 	)
 
+	// Clean up stale diff dirs from prior (possibly killed) sessions.
+	if err := platform.CleanupStaleDiffDirs(".crobot"); err != nil {
+		slog.Warn("failed to clean stale diff dirs", "error", err)
+	}
+
 	// Register tools.
 	h := newHandler(plat, cfg)
 	defs := toolDefinitions()

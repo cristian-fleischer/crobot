@@ -202,7 +202,7 @@ func TestFSHandlerDiskFallback(t *testing.T) {
 	diffDir := filepath.Join(repoDir, ".crobot", "diffs-123")
 	os.MkdirAll(filepath.Join(diffDir, "src"), 0o755)
 	os.WriteFile(filepath.Join(diffDir, "src", "auth.go"), []byte("diff content here"), 0o644)
-	os.WriteFile(filepath.Join(diffDir, "_index.md"), []byte("# Index\n"), 0o644)
+	os.WriteFile(filepath.Join(diffDir, ".crobot-index.md"), []byte("# Index\n"), 0o644)
 
 	handler, err := NewFSHandler("abcd1234", repoDir)
 	if err != nil {
@@ -225,7 +225,7 @@ func TestFSHandlerDiskFallback(t *testing.T) {
 	}
 
 	// Read the index file.
-	params, _ = json.Marshal(readTextFileParams{Path: ".crobot/diffs-123/_index.md"})
+	params, _ = json.Marshal(readTextFileParams{Path: ".crobot/diffs-123/.crobot-index.md"})
 	result, err = handler.HandleRequest(context.Background(), "fs/read_text_file", params)
 	if err != nil {
 		t.Fatalf("HandleRequest for index: %v", err)

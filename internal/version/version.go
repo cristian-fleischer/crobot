@@ -2,4 +2,4 @@
 package version
 
 // Version is the current version of crobot.
-const Version = "0.3.29-alpha"
+const Version = "0.3.31-alpha"

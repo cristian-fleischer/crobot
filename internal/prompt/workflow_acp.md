@@ -3,7 +3,7 @@
 The PR metadata and changed files list are provided below. Per-file diffs
 are written to disk at `.crobot/diffs-<run-id>/`.
 
-1. Read `.crobot/diffs-<run-id>/_index.md` for the file list with sizes.
+1. Read `.crobot/diffs-<run-id>/.crobot-index.md` for the file list with sizes.
 2. Read individual file diffs at `.crobot/diffs-<run-id>/<file-path>`.
 3. Read the PR title and description to understand the intent.
 4. For deeper context, read full source files with filesystem access.

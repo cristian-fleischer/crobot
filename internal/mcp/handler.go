@@ -84,7 +84,6 @@ func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolReq
 	}
 
 	// Write diffs to disk for incremental agent consumption.
-	platform.CleanupStaleDiffDirs(".crobot")
 	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
 	diffDir := platform.NewDiffDir(".crobot")
 	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
@@ -92,12 +91,14 @@ func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolReq
 	}
 
 	// Return context without inline hunks; agents read from diff_dir.
+	// Shallow-copy to avoid mutating the original PRContext.
+	ctxCopy := *prCtx
+	ctxCopy.DiffHunks = nil
 	resp := exportResponse{
-		PRContext: prCtx,
+		PRContext: &ctxCopy,
 		DiffDir:   diffDir,
 		DiffStats: stats,
 	}
-	resp.PRContext.DiffHunks = nil
 
 	data, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
@@ -186,7 +187,6 @@ func (h *handler) handleExportLocalContext(ctx context.Context, req mcp.CallTool
 	}
 
 	// Write diffs to disk for incremental agent consumption.
-	platform.CleanupStaleDiffDirs(".crobot")
 	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
 	diffDir := platform.NewDiffDir(".crobot")
 	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
@@ -194,12 +194,14 @@ func (h *handler) handleExportLocalContext(ctx context.Context, req mcp.CallTool
 	}
 
 	// Return context without inline hunks; agents read from diff_dir.
+	// Shallow-copy to avoid mutating the original PRContext.
+	ctxCopy := *prCtx
+	ctxCopy.DiffHunks = nil
 	resp := exportResponse{
-		PRContext: prCtx,
+		PRContext: &ctxCopy,
 		DiffDir:   diffDir,
 		DiffStats: stats,
 	}
-	resp.PRContext.DiffHunks = nil
 
 	data, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {

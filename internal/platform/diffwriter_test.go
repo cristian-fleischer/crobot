@@ -80,9 +80,9 @@ func TestWriteDiffFiles(t *testing.T) {
 	}
 
 	// Check index file.
-	indexContent, err := os.ReadFile(filepath.Join(outputDir, "_index.md"))
+	indexContent, err := os.ReadFile(filepath.Join(outputDir, ".crobot-index.md"))
 	if err != nil {
-		t.Fatalf("reading _index.md: %v", err)
+		t.Fatalf("reading .crobot-index.md: %v", err)
 	}
 	indexStr := string(indexContent)
 	if !strings.Contains(indexStr, "2 files changed") {
@@ -110,9 +110,9 @@ func TestWriteDiffFiles_Empty(t *testing.T) {
 	}
 
 	// Index should still exist.
-	indexContent, err := os.ReadFile(filepath.Join(outputDir, "_index.md"))
+	indexContent, err := os.ReadFile(filepath.Join(outputDir, ".crobot-index.md"))
 	if err != nil {
-		t.Fatalf("reading _index.md: %v", err)
+		t.Fatalf("reading .crobot-index.md: %v", err)
 	}
 	if !strings.Contains(string(indexContent), "0 files changed") {
 		t.Error("index should report 0 files changed")
@@ -136,9 +136,9 @@ func TestWriteDiffFiles_LowValueNotes(t *testing.T) {
 		t.Fatalf("WriteDiffFiles: %v", err)
 	}
 
-	indexContent, err := os.ReadFile(filepath.Join(outputDir, "_index.md"))
+	indexContent, err := os.ReadFile(filepath.Join(outputDir, ".crobot-index.md"))
 	if err != nil {
-		t.Fatalf("reading _index.md: %v", err)
+		t.Fatalf("reading .crobot-index.md: %v", err)
 	}
 	indexStr := string(indexContent)
 

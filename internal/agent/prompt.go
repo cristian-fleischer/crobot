@@ -78,7 +78,7 @@ func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest, diffD
 	if dir != "" {
 		b.WriteString("\n## Diff Access\n\n")
 		b.WriteString("Per-file diffs are available on disk. Start by reading the index:\n")
-		b.WriteString(fmt.Sprintf("  %s/_index.md\n\n", dir))
+		b.WriteString(fmt.Sprintf("  %s/.crobot-index.md\n\n", dir))
 		b.WriteString(fmt.Sprintf("Then read individual file diffs at `%s/<file-path>`.\n", dir))
 		b.WriteString("Focus on source code files. Lock files, generated code, and vendor\n")
 		b.WriteString("dependencies are flagged in the index -- review only if relevant.\n\n")

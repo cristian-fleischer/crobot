@@ -33,7 +33,7 @@ func CleanupStaleDiffDirs(baseDir string) error {
 
 // WriteDiffFiles writes per-file diff hunks and an index to outputDir. Each
 // file at outputDir/<path> contains the formatted unified diff hunks. The
-// index at outputDir/_index.md lists all files with stats.
+// index at outputDir/.crobot-index.md lists all files with stats.
 func WriteDiffFiles(hunks []DiffHunk, stats DiffStats, outputDir string) error {
 	// Group hunks by file.
 	hunksByFile := make(map[string][]DiffHunk)
@@ -42,8 +42,16 @@ func WriteDiffFiles(hunks []DiffHunk, stats DiffStats, outputDir string) error {
 	}
 
 	// Write per-file diffs.
+	absOutput, err := filepath.Abs(outputDir)
+	if err != nil {
+		return fmt.Errorf("resolving output dir: %w", err)
+	}
 	for path, fileHunks := range hunksByFile {
-		filePath := filepath.Join(outputDir, path)
+		filePath := filepath.Join(absOutput, path)
+		// Guard against path traversal from untrusted platform data.
+		if rel, err := filepath.Rel(absOutput, filePath); err != nil || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("diff path %q escapes output directory", path)
+		}
 
 		if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 			return fmt.Errorf("creating dir for %s: %w", path, err)
@@ -69,7 +77,7 @@ func WriteDiffFiles(hunks []DiffHunk, stats DiffStats, outputDir string) error {
 
 	// Write index file.
 	index := buildIndex(stats, outputDir)
-	indexPath := filepath.Join(outputDir, "_index.md")
+	indexPath := filepath.Join(outputDir, ".crobot-index.md")
 	if err := os.WriteFile(indexPath, []byte(index), 0o644); err != nil {
 		return fmt.Errorf("writing index: %w", err)
 	}

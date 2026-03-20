@@ -16,7 +16,7 @@ func isolateConfig(t *testing.T) {
 }
 
 func TestReviewCmd_NoPR_EntersLocalMode(t *testing.T) {
-	t.Parallel()
+	isolateConfig(t)
 
 	// When no PR is given, the command enters local mode. It will fail
 	// later (agent resolution, etc.) but should NOT fail with "PR required".
@@ -721,7 +721,7 @@ func TestAgentCommandWhitespaceValidation(t *testing.T) {
 // TestReviewCmd_WriteOverriddenInLocalMode verifies that --write is ignored
 // when no PR is specified (local mode always forces dry-run).
 func TestReviewCmd_WriteOverriddenInLocalMode(t *testing.T) {
-	t.Parallel()
+	isolateConfig(t)
 
 	// In local mode (no PR), even with --write, the command should not attempt
 	// to post comments. It will fail at agent resolution, but should NOT fail

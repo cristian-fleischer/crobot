@@ -144,7 +144,7 @@ func TestBuildReviewPrompt_FileBased(t *testing.T) {
 	if !strings.Contains(prompt, "## Diff Access") {
 		t.Error("expected '## Diff Access' section")
 	}
-	if !strings.Contains(prompt, ".crobot/diffs-123/_index.md") {
+	if !strings.Contains(prompt, ".crobot/diffs-123/.crobot-index.md") {
 		t.Error("expected index path in prompt")
 	}
 	if !strings.Contains(prompt, ".crobot/diffs-123/<file-path>") {

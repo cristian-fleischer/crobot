@@ -430,7 +430,7 @@ deduplicating against prior comments, and posting.
 
 The agent receives PR metadata and a pointer to on-disk diffs in the prompt.
 Diffs are written as individual files under `.crobot/diffs-<run-id>/`, with an
-`_index.md` that lists all files with sizes and low-value flags (lock files,
+`.crobot-index.md` that lists all files with sizes and low-value flags (lock files,
 generated code, vendor). The agent reads selectively, which handles large PRs
 that would exceed context windows. The agent may optionally call
 `list_bot_comments` to check for prior reviews, but must never post findings
@@ -663,6 +663,7 @@ The PR reference (URL or number) can be passed as a positional argument or via
 | `--dry-run`           | bool   | no       | `true`     | Validate without posting (default behavior)              |
 | `--write`             | bool   | no       | `false`    | Actually post comments to the PR                         |
 | `--max-comments`      | int    | no       | config     | Max comments to post (`0` = unlimited)                   |
+| `-t`, `--timeout`     | int    | no       | `600`      | Agent timeout in seconds (`CROBOT_TIMEOUT` env also works) |
 | `--show-agent-output` | bool   | no       | `false`    | Stream formatted agent output with progress indicator    |
 | `--raw`               | bool   | no       | `false`    | Disable markdown formatting and progress indicator       |
 | `-i`, `--instructions`| string | no       |            | Additional instructions appended to the review prompt    |
@@ -903,7 +904,8 @@ agent:
       command: claude-agent-acp
       args: []
 
-  # Overall timeout in seconds for the agent subprocess. Default: 300 (5 min).
+  # Overall timeout in seconds for the agent subprocess. Default: 600 (10 min).
+  # Override with CROBOT_TIMEOUT env var or --timeout flag.
   timeout: 600
 
 # AI provider settings (Phase 5 - not yet implemented).
@@ -934,6 +936,7 @@ Environment variables override config file values.
 | `CROBOT_DRY_RUN`               | Default dry-run mode (`true`, `1`, `yes`)        | `true`       |
 | `CROBOT_AGENT`                 | Default agent name for `crobot review`           |              |
 | `CROBOT_MODEL`                 | Default model ID to request from the agent       |              |
+| `CROBOT_TIMEOUT`               | Agent timeout in seconds                         | `600`        |
 | `CROBOT_AI_PROVIDER`           | Default AI provider (Phase 5)                    |              |
 | `CROBOT_ANTHROPIC_API_KEY`     | Anthropic API key (Phase 5)                      |              |
 | `CROBOT_OPENAI_API_KEY`        | OpenAI API key (Phase 5)                         |              |

@@ -238,8 +238,17 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 		return nil, fmt.Errorf("fetching PR context: %w", err)
 	}
 
+	// 1b. Write per-file diffs to disk for incremental agent consumption.
+	platform.CleanupStaleDiffDirs(".crobot")
+	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
+	diffDir := platform.NewDiffDir(".crobot")
+	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
+		return nil, fmt.Errorf("writing diff files: %w", err)
+	}
+	defer platform.CleanupDiffDir(diffDir)
+
 	// 2. Build review prompt (with custom philosophy if provided).
-	prompt := agent.BuildFullPromptWithPhilosophy(prCtx, &opts.PRRequest, opts.Philosophy)
+	prompt := agent.BuildFullPromptWithPhilosophy(prCtx, &opts.PRRequest, opts.Philosophy, diffDir)
 	if opts.Instructions != "" {
 		prompt += "\n\n## Additional Instructions\n\n" + opts.Instructions + "\n"
 	}

@@ -13,6 +13,14 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// exportResponse wraps PRContext with diff directory and stats for file-based
+// diff access. DiffHunks are omitted from JSON since agents read them from disk.
+type exportResponse struct {
+	*platform.PRContext
+	DiffDir   string              `json:"diff_dir"`
+	DiffStats platform.DiffStats  `json:"diff_stats"`
+}
+
 // handler routes MCP tool calls to the appropriate platform/review-engine
 // methods. It holds the shared dependencies needed by all tool handlers.
 type handler struct {
@@ -55,7 +63,8 @@ func toolError(msg string, err error) *mcp.CallToolResult {
 	return mcp.NewToolResultError(msg)
 }
 
-// handleExportPRContext fetches and returns the full PR context as JSON.
+// handleExportPRContext fetches the PR context, writes per-file diffs to disk,
+// and returns the context with a diff_dir pointer instead of inline hunks.
 func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	workspace := mcp.ParseString(req, "workspace", "")
 	repo := mcp.ParseString(req, "repo", "")
@@ -74,7 +83,23 @@ func (h *handler) handleExportPRContext(ctx context.Context, req mcp.CallToolReq
 		return toolError("failed to fetch PR context", err), nil
 	}
 
-	data, err := json.MarshalIndent(prCtx, "", "  ")
+	// Write diffs to disk for incremental agent consumption.
+	platform.CleanupStaleDiffDirs(".crobot")
+	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
+	diffDir := platform.NewDiffDir(".crobot")
+	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
+		return toolError("failed to write diff files", err), nil
+	}
+
+	// Return context without inline hunks; agents read from diff_dir.
+	resp := exportResponse{
+		PRContext: prCtx,
+		DiffDir:   diffDir,
+		DiffStats: stats,
+	}
+	resp.PRContext.DiffHunks = nil
+
+	data, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshaling PR context: %w", err)
 	}
@@ -148,7 +173,8 @@ func (h *handler) handleListBotComments(ctx context.Context, req mcp.CallToolReq
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleExportLocalContext builds a PRContext from local git state and returns it as JSON.
+// handleExportLocalContext builds a PRContext from local git state, writes
+// per-file diffs to disk, and returns the context with a diff_dir pointer.
 func (h *handler) handleExportLocalContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	baseBranch := mcp.ParseString(req, "base_branch", "master")
 	repoDir := mcp.ParseString(req, "repo_dir", ".")
@@ -159,7 +185,23 @@ func (h *handler) handleExportLocalContext(ctx context.Context, req mcp.CallTool
 		return toolError("failed to export local context", err), nil
 	}
 
-	data, err := json.MarshalIndent(prCtx, "", "  ")
+	// Write diffs to disk for incremental agent consumption.
+	platform.CleanupStaleDiffDirs(".crobot")
+	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
+	diffDir := platform.NewDiffDir(".crobot")
+	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {
+		return toolError("failed to write diff files", err), nil
+	}
+
+	// Return context without inline hunks; agents read from diff_dir.
+	resp := exportResponse{
+		PRContext: prCtx,
+		DiffDir:   diffDir,
+		DiffStats: stats,
+	}
+	resp.PRContext.DiffHunks = nil
+
+	data, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshaling local context: %w", err)
 	}

@@ -24,8 +24,10 @@ func BuildSystemPromptWithPhilosophy(philosophy string) string {
 }
 
 // BuildReviewPrompt formats the PR context into a review prompt for the agent.
-// It includes PR metadata, changed files, and the full diff organized by file.
-func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) string {
+// It includes PR metadata, changed files, and instructions to read diffs from
+// the specified directory. If diffDir is empty, the diff is included inline
+// (legacy behavior).
+func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest, diffDir ...string) string {
 	var b strings.Builder
 
 	b.WriteString("# Pull Request Review\n\n")
@@ -67,30 +69,46 @@ func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) strin
 		}
 	}
 
-	// Diff hunks organized by file
-	b.WriteString("\n## Diff\n\n")
-	if len(prCtx.DiffHunks) == 0 {
-		b.WriteString("No diff hunks available.\n")
+	// Diff section: file-based if diffDir provided, inline otherwise.
+	dir := ""
+	if len(diffDir) > 0 {
+		dir = diffDir[0]
+	}
+
+	if dir != "" {
+		b.WriteString("\n## Diff Access\n\n")
+		b.WriteString("Per-file diffs are available on disk. Start by reading the index:\n")
+		b.WriteString(fmt.Sprintf("  %s/_index.md\n\n", dir))
+		b.WriteString(fmt.Sprintf("Then read individual file diffs at `%s/<file-path>`.\n", dir))
+		b.WriteString("Focus on source code files. Lock files, generated code, and vendor\n")
+		b.WriteString("dependencies are flagged in the index -- review only if relevant.\n\n")
+		b.WriteString("Only comment on lines that appear within the diff hunks.\n")
 	} else {
-		hunksByFile := groupHunksByFile(prCtx.DiffHunks)
-		for _, file := range orderedFiles(prCtx.DiffHunks) {
-			b.WriteString(fmt.Sprintf("### %s\n\n", file))
-			for _, hunk := range hunksByFile[file] {
-				b.WriteString(fmt.Sprintf("```diff\n@@ -%d,%d +%d,%d @@\n",
-					hunk.OldStart, hunk.OldLines,
-					hunk.NewStart, hunk.NewLines))
-				b.WriteString(hunk.Body)
-				if !strings.HasSuffix(hunk.Body, "\n") {
-					b.WriteString("\n")
+		// Legacy inline diff for cases without a diff directory.
+		b.WriteString("\n## Diff\n\n")
+		if len(prCtx.DiffHunks) == 0 {
+			b.WriteString("No diff hunks available.\n")
+		} else {
+			hunksByFile := groupHunksByFile(prCtx.DiffHunks)
+			for _, file := range orderedFiles(prCtx.DiffHunks) {
+				b.WriteString(fmt.Sprintf("### %s\n\n", file))
+				for _, hunk := range hunksByFile[file] {
+					b.WriteString(fmt.Sprintf("```diff\n@@ -%d,%d +%d,%d @@\n",
+						hunk.OldStart, hunk.OldLines,
+						hunk.NewStart, hunk.NewLines))
+					b.WriteString(hunk.Body)
+					if !strings.HasSuffix(hunk.Body, "\n") {
+						b.WriteString("\n")
+					}
+					b.WriteString("```\n\n")
 				}
-				b.WriteString("```\n\n")
 			}
 		}
 	}
 
 	// Instructions for the review
 	b.WriteString("## Instructions\n\n")
-	b.WriteString("Review the diff above and output your findings as a JSON array of ReviewFinding objects.\n")
+	b.WriteString("Review the diff and output your findings as a JSON array of ReviewFinding objects.\n")
 	b.WriteString("Only comment on lines that appear within the diff hunks.\n")
 	b.WriteString("Leave the `fingerprint` field empty.\n")
 	b.WriteString("If no issues are found, output: []\n")
@@ -101,14 +119,17 @@ func BuildReviewPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) strin
 // BuildFullPrompt combines the system prompt and review prompt into a single
 // string. This is used when the ACP protocol does not support separate system
 // prompts. The optional PRRequest provides workspace, repo, and PR number metadata.
-func BuildFullPrompt(prCtx *platform.PRContext, ref *platform.PRRequest) string {
-	return BuildSystemPrompt() + "\n---\n\n" + BuildReviewPrompt(prCtx, ref)
+// An optional diffDir may be provided to reference file-based diffs instead of
+// including them inline.
+func BuildFullPrompt(prCtx *platform.PRContext, ref *platform.PRRequest, diffDir ...string) string {
+	return BuildSystemPrompt() + "\n---\n\n" + BuildReviewPrompt(prCtx, ref, diffDir...)
 }
 
 // BuildFullPromptWithPhilosophy combines the system prompt (with custom
-// philosophy) and review prompt into a single string.
-func BuildFullPromptWithPhilosophy(prCtx *platform.PRContext, ref *platform.PRRequest, philosophy string) string {
-	return BuildSystemPromptWithPhilosophy(philosophy) + "\n---\n\n" + BuildReviewPrompt(prCtx, ref)
+// philosophy) and review prompt into a single string. An optional diffDir may
+// be provided to reference file-based diffs instead of including them inline.
+func BuildFullPromptWithPhilosophy(prCtx *platform.PRContext, ref *platform.PRRequest, philosophy string, diffDir ...string) string {
+	return BuildSystemPromptWithPhilosophy(philosophy) + "\n---\n\n" + BuildReviewPrompt(prCtx, ref, diffDir...)
 }
 
 // groupHunksByFile groups diff hunks by their file path.

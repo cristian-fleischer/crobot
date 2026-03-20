@@ -1016,7 +1016,7 @@ write_local_config() {
 
 check_gitignore() {
   if [[ ! -f ".gitignore" ]]; then
-    warn ".gitignore not found. Consider adding .crobot.yaml to prevent committing secrets."
+    warn ".gitignore not found. Consider adding .crobot.yaml and .crobot/ to prevent committing secrets and ephemeral data."
     return
   fi
   if ! grep -qx '.crobot.yaml' .gitignore 2>/dev/null; then
@@ -1025,6 +1025,14 @@ check_gitignore() {
       success "Added .crobot.yaml to .gitignore"
     else
       warn "Remember to add .crobot.yaml to .gitignore to avoid committing secrets."
+    fi
+  fi
+  if ! grep -qx '.crobot/' .gitignore 2>/dev/null; then
+    if confirm "Add .crobot/ to .gitignore? (recommended -- contains ephemeral review data)"; then
+      echo ".crobot/" >> .gitignore
+      success "Added .crobot/ to .gitignore"
+    else
+      warn "Remember to add .crobot/ to .gitignore to avoid committing ephemeral review data."
     fi
   fi
 }

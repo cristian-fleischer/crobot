@@ -8,7 +8,10 @@ Only read and analyze code.
 
 Follow these steps in order when reviewing a pull request:
 
-1. Call `export_pr_context` to get PR metadata, changed files, and diffs.
+1. Call `export_pr_context` to get PR metadata and changed files.
+   Diffs are written to `diff_dir` (returned in the response).
+   Read `.crobot/diffs-<run-id>/_index.md` for the file index, then read
+   individual file diffs from disk as needed.
 2. Read the PR title and description to understand the intent. Identify primary
    files vs. supporting changes.
 3. For each primary file, read the full file from disk. Trace call chains, check
@@ -26,6 +29,9 @@ When reviewing local changes that haven't been pushed yet:
 
 1. Call `export_local_context` to get the diff of local changes against a base
    branch. Optionally specify `base_branch` (default: "master").
+   Diffs are written to `diff_dir` (returned in the response).
+   Read `.crobot/diffs-<run-id>/_index.md` for the file index, then read
+   individual file diffs from disk as needed.
 2. Read the diff and changed files to understand the scope of changes.
 3. For each changed file, read the full file from disk for additional context.
 4. Formulate findings as a JSON array of ReviewFinding objects.

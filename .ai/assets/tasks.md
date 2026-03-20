@@ -317,6 +317,120 @@
 
 ---
 
+## Phase 3.8: Local (Pre-Push) Review
+
+> Review local git changes before pushing. No PR or platform credentials needed.
+
+### P3.8.1 Local Platform Provider
+
+- [x] P3.8.1.1 Implement `local.Provider` (`internal/platform/local/provider.go`)
+  - [x] `GetPRContext` via `git diff` against merge-base (committed + staged + unstaged)
+  - [x] `GetFileContent` via `git show`
+  - [x] No-op `ListBotComments`, error on `CreateInlineComment`/`DeleteComment`
+  - [x] `parseNameStatus` helper for `git diff --name-status`
+  - [x] `RepoName()` from directory basename
+  - [x] Validate git repo exists and base branch is resolvable
+- [x] P3.8.1.2 Unit tests (`internal/platform/local/provider_test.go`)
+  - [x] Temp git repo with committed + unstaged changes
+  - [x] GetPRContext (fields, files, hunks, unstaged changes)
+  - [x] No changes, bad base branch, not a repo error cases
+  - [x] ListBotComments (empty), CreateInlineComment (error)
+  - [x] parseNameStatus edge cases
+  - [x] RepoName
+
+### P3.8.2 Enhanced Findings Rendering
+
+- [x] P3.8.2.1 `RenderFindings` function (`internal/cli/render.go`)
+  - [x] Diff context snippet with ANSI-colored line numbers
+  - [x] `extractDiffContext` — walk hunk body tracking old/new line counters
+  - [x] Target line highlighting, green/red diff coloring
+- [x] P3.8.2.2 Unit tests (`internal/cli/render_test.go`)
+  - [x] extractDiffContext with various line positions, wrong path, context window
+  - [x] renderDiffSnippet output verification
+
+### P3.8.3 CLI Wiring
+
+- [x] P3.8.3.1 Wire local mode into `review` command (`internal/cli/review.go`)
+  - [x] Detect local mode when no PR specified (`isLocalMode := prValue == ""`)
+  - [x] `--base` flag (default: `master`) for base branch
+  - [x] Force dry-run in local mode, construct synthetic PRRequest
+  - [x] Replace inline findings rendering with `RenderFindings()`
+  - [x] Updated help text and examples for local mode
+- [x] P3.8.3.2 Unit tests for `--base` flag parsing and defaults
+- [x] P3.8.3.3 Updated existing "missing PR" test for local mode behavior
+
+### P3.8.4 Prompt & MCP Support
+
+- [x] P3.8.4.1 Handle PR #0 in prompt metadata (`internal/agent/prompt.go`)
+  - [x] Show "Local Review" instead of "PR Number: 0"
+- [x] P3.8.4.2 `export_local_context` MCP tool (`internal/mcp/tools.go`, `handler.go`)
+  - [x] Parameters: `base_branch`, `repo_dir` (both optional)
+  - [x] Uses local provider to return PRContext JSON
+- [x] P3.8.4.3 Updated MCP workflow instructions (`workflow_mcp.md`)
+  - [x] Local review section with steps
+- [x] P3.8.4.4 Updated agent skill for local review support
+
+---
+
+## Phase 3.9: File-Based Diffs (Large PR Handling)
+
+> Moves diffs out of the prompt into per-file disk files so agents can read
+> selectively. Handles large PRs (lock files, generated code, bulk renames)
+> that would exceed context windows.
+
+### P3.9.1 Diff Stats & Low-Value Classification
+
+- [x] P3.9.1.1 `DiffStats` / `FileDiffStats` types (`internal/platform/diffsize.go`)
+- [x] P3.9.1.2 `ComputeDiffStats()` with per-file hunk count and byte size
+- [x] P3.9.1.3 Low-value file classification (lock, vendor, generated, minified, protobuf)
+- [x] P3.9.1.4 Unit tests (`internal/platform/diffsize_test.go`)
+
+### P3.9.2 Diff File Writer
+
+- [x] P3.9.2.1 `NewDiffDir()` with unique nanosecond timestamp (`internal/platform/diffwriter.go`)
+- [x] P3.9.2.2 `WriteDiffFiles()` -- per-file diffs + markdown index with stats
+- [x] P3.9.2.3 `CleanupStaleDiffDirs()` -- startup cleanup of orphaned dirs
+- [x] P3.9.2.4 `CleanupDiffDir()` -- deferred cleanup after review
+- [x] P3.9.2.5 Unit tests (`internal/platform/diffwriter_test.go`)
+
+### P3.9.3 FSHandler Disk Fallback
+
+- [x] P3.9.3.1 `.crobot/` prefix check in `readTextFile` (`internal/agent/fs.go`)
+  - [x] Reads from disk via `os.ReadFile` instead of `git show`
+- [x] P3.9.3.2 Unit tests for disk fallback and not-found cases
+
+### P3.9.4 Prompt Changes
+
+- [x] P3.9.4.1 `BuildReviewPrompt` accepts optional `diffDir` parameter
+  - [x] File-based: `## Diff Access` section with index + file path template
+  - [x] Inline fallback preserved when `diffDir` is empty
+- [x] P3.9.4.2 `BuildFullPrompt` / `BuildFullPromptWithPhilosophy` pass through `diffDir`
+- [x] P3.9.4.3 Unit tests for file-based prompt mode
+
+### P3.9.5 ACP Review Wiring
+
+- [x] P3.9.5.1 `runReview` writes diffs to disk before prompting (`internal/cli/review.go`)
+  - [x] Cleanup stale dirs, compute stats, write, defer cleanup
+  - [x] Pass `diffDir` to `BuildFullPromptWithPhilosophy`
+
+### P3.9.6 MCP Export Changes
+
+- [x] P3.9.6.1 `handleExportPRContext` writes diffs, returns `diff_dir` + `diff_stats`, omits inline hunks
+- [x] P3.9.6.2 `handleExportLocalContext` same treatment
+- [x] P3.9.6.3 `exportResponse` wrapper struct with `diff_dir` and `diff_stats` fields
+
+### P3.9.7 Workflow Instruction Updates
+
+- [x] P3.9.7.1 `workflow_acp.md` -- rewritten for file-based diffs
+- [x] P3.9.7.2 `workflow_mcp.md` -- updated for `diff_dir` in both PR and local modes
+
+### P3.9.8 Setup & Cleanup
+
+- [x] P3.9.8.1 `setup.sh` -- add `.crobot/` to `.gitignore` prompt
+- [x] P3.9.8.2 `.gitignore` -- add `.crobot/` entry
+
+---
+
 ## Phase 4: Native Agent SDK Adapters
 
 > Tests: Each SDK adapter must have unit tests for bridge subprocess management,
@@ -433,61 +547,6 @@
 - [ ] P5.3.1 Extend `review` command with `--provider` flag (reuses existing `--model` flag)
 - [ ] P5.3.2 Wire provider selection (config-driven + CLI override)
 - [ ] P5.3.3 Integration tests with recorded API responses
-
----
-
-## Phase 3.8: Local (Pre-Push) Review
-
-> Review local git changes before pushing. No PR or platform credentials needed.
-
-### P3.8.1 Local Platform Provider
-
-- [x] P3.8.1.1 Implement `local.Provider` (`internal/platform/local/provider.go`)
-  - [x] `GetPRContext` via `git diff` against merge-base (committed + staged + unstaged)
-  - [x] `GetFileContent` via `git show`
-  - [x] No-op `ListBotComments`, error on `CreateInlineComment`/`DeleteComment`
-  - [x] `parseNameStatus` helper for `git diff --name-status`
-  - [x] `RepoName()` from directory basename
-  - [x] Validate git repo exists and base branch is resolvable
-- [x] P3.8.1.2 Unit tests (`internal/platform/local/provider_test.go`)
-  - [x] Temp git repo with committed + unstaged changes
-  - [x] GetPRContext (fields, files, hunks, unstaged changes)
-  - [x] No changes, bad base branch, not a repo error cases
-  - [x] ListBotComments (empty), CreateInlineComment (error)
-  - [x] parseNameStatus edge cases
-  - [x] RepoName
-
-### P3.8.2 Enhanced Findings Rendering
-
-- [x] P3.8.2.1 `RenderFindings` function (`internal/cli/render.go`)
-  - [x] Diff context snippet with ANSI-colored line numbers
-  - [x] `extractDiffContext` — walk hunk body tracking old/new line counters
-  - [x] Target line highlighting, green/red diff coloring
-- [x] P3.8.2.2 Unit tests (`internal/cli/render_test.go`)
-  - [x] extractDiffContext with various line positions, wrong path, context window
-  - [x] renderDiffSnippet output verification
-
-### P3.8.3 CLI Wiring
-
-- [x] P3.8.3.1 Wire local mode into `review` command (`internal/cli/review.go`)
-  - [x] Detect local mode when no PR specified (`isLocalMode := prValue == ""`)
-  - [x] `--base` flag (default: `master`) for base branch
-  - [x] Force dry-run in local mode, construct synthetic PRRequest
-  - [x] Replace inline findings rendering with `RenderFindings()`
-  - [x] Updated help text and examples for local mode
-- [x] P3.8.3.2 Unit tests for `--base` flag parsing and defaults
-- [x] P3.8.3.3 Updated existing "missing PR" test for local mode behavior
-
-### P3.8.4 Prompt & MCP Support
-
-- [x] P3.8.4.1 Handle PR #0 in prompt metadata (`internal/agent/prompt.go`)
-  - [x] Show "Local Review" instead of "PR Number: 0"
-- [x] P3.8.4.2 `export_local_context` MCP tool (`internal/mcp/tools.go`, `handler.go`)
-  - [x] Parameters: `base_branch`, `repo_dir` (both optional)
-  - [x] Uses local provider to return PRContext JSON
-- [x] P3.8.4.3 Updated MCP workflow instructions (`workflow_mcp.md`)
-  - [x] Local review section with steps
-- [x] P3.8.4.4 Updated agent skill for local review support
 
 ---
 

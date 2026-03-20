@@ -23,7 +23,7 @@ func TestBuildSystemPrompt(t *testing.T) {
 		"What to comment on",
 		"What to skip",
 		"Output Format",
-		"You do NOT need to fetch any data",
+		"Per-file diffs",
 	}
 
 	for _, s := range required {
@@ -102,7 +102,7 @@ func TestBuildReviewPrompt_FullPR(t *testing.T) {
 		}
 	}
 
-	// Check diff content
+	// Check diff content (inline mode, no diffDir)
 	for _, s := range []string{
 		"@@ -0,0 +1,5 @@",
 		"+func Verify(token string) bool",
@@ -117,6 +117,54 @@ func TestBuildReviewPrompt_FullPR(t *testing.T) {
 	// Check instructions
 	if !strings.Contains(prompt, "fingerprint") {
 		t.Error("BuildReviewPrompt() missing fingerprint instruction")
+	}
+}
+
+func TestBuildReviewPrompt_FileBased(t *testing.T) {
+	t.Parallel()
+
+	prCtx := &platform.PRContext{
+		Title:        "Add auth",
+		Author:       "jdoe",
+		SourceBranch: "feature/auth",
+		TargetBranch: "main",
+		State:        "OPEN",
+		Files: []platform.ChangedFile{
+			{Path: "src/auth.go", Status: "added"},
+		},
+		DiffHunks: []platform.DiffHunk{
+			{Path: "src/auth.go", Body: "+package auth\n"},
+		},
+	}
+
+	ref := &platform.PRRequest{Workspace: "myteam", Repo: "myrepo", PRNumber: 42}
+	prompt := BuildReviewPrompt(prCtx, ref, ".crobot/diffs-123")
+
+	// Should contain diff access instructions, not inline diffs.
+	if !strings.Contains(prompt, "## Diff Access") {
+		t.Error("expected '## Diff Access' section")
+	}
+	if !strings.Contains(prompt, ".crobot/diffs-123/_index.md") {
+		t.Error("expected index path in prompt")
+	}
+	if !strings.Contains(prompt, ".crobot/diffs-123/<file-path>") {
+		t.Error("expected file path template in prompt")
+	}
+
+	// Should NOT contain inline diff content.
+	if strings.Contains(prompt, "## Diff\n") {
+		t.Error("should not contain inline '## Diff' section when diffDir is set")
+	}
+	if strings.Contains(prompt, "```diff") {
+		t.Error("should not contain inline diff blocks when diffDir is set")
+	}
+
+	// Should still contain metadata and changed files.
+	if !strings.Contains(prompt, "Add auth") {
+		t.Error("missing PR title")
+	}
+	if !strings.Contains(prompt, "src/auth.go") {
+		t.Error("missing changed file")
 	}
 }
 

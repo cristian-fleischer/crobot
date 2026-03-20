@@ -135,6 +135,8 @@ crobot export-skill --agent claude-code    # Install skill
   Gemini CLI, Codex, OpenCode, Copilot)
 - **Safe by default**: Dry-run is the default; use `--write` to post
 - **Smart deduplication**: Fingerprints prevent duplicate comments on re-runs
+- **File-based diffs**: Writes per-file diffs to disk so agents can read
+  selectively, handling large PRs that would exceed context windows
 - **Diff-aware validation**: Only comments on lines actually changed in the PR
 - **Customizable review philosophy**: Export, edit, and override what the AI
   focuses on
@@ -259,8 +261,10 @@ bitbucket:
 
 > **Security note:** If you store credentials in the config file, ensure it is
 > not committed to version control. For CI environments, prefer environment
-> variables and a secrets manager. Add `.crobot.yaml` to your `.gitignore` if
-> using per-project config with credentials.
+> variables and a secrets manager. Add `.crobot.yaml` and `.crobot/` to your
+> `.gitignore` if using per-project config with credentials. The `.crobot/`
+> directory contains ephemeral review data (per-file diffs) that is cleaned up
+> automatically but should not be committed.
 
 ---
 
@@ -413,19 +417,24 @@ deduplicating against prior comments, and posting.
 | Step | Actor  | Action                                                                                                            |
 |------|--------|---------------------------------------------------------------------------------------------------------------------------|
 | 1    | CRoBot | Fetch PR context from platform (metadata, changed files, diff hunks)                                                      |
-| 2    | CRoBot | Build review prompt (methodology + philosophy + PR data)                                                                  |
-| 3    | CRoBot | Spawn agent subprocess (ACP handshake)                                                                                    |
-| 4    | CRoBot | Send prompt to agent                                                                                                      |
-| 5    | Agent  | Read diff from prompt; read full files from disk for context                                                              |
-| 6    | Agent  | Output JSON array of ReviewFindings                                                                                       |
-| 7    | CRoBot | Parse findings from agent response                                                                                        |
-| 8    | CRoBot | Review engine: validate findings against diff, deduplicate against existing comments, enforce max-comments / severity     |
-| 9    | CRoBot | Post inline comments (or dry-run)                                                                                         |
+| 2    | CRoBot | Write per-file diffs to `.crobot/diffs-<run-id>/` with an index file                                                      |
+| 3    | CRoBot | Build review prompt (methodology + philosophy + PR metadata + pointer to diff directory)                                   |
+| 4    | CRoBot | Spawn agent subprocess (ACP handshake)                                                                                    |
+| 5    | CRoBot | Send prompt to agent                                                                                                      |
+| 6    | Agent  | Read diff index and individual file diffs from disk; read full source files for context                                   |
+| 7    | Agent  | Output JSON array of ReviewFindings                                                                                       |
+| 8    | CRoBot | Parse findings from agent response                                                                                        |
+| 9    | CRoBot | Review engine: validate findings against diff, deduplicate against existing comments, enforce max-comments / severity     |
+| 10   | CRoBot | Post inline comments (or dry-run)                                                                                         |
+| 11   | CRoBot | Clean up diff directory                                                                                                   |
 
-The agent receives the full PR context in the prompt and does not need to call
-any CRoBot commands or tools. It may optionally call `list_bot_comments` to
-check for prior reviews, but must never post findings itself -- CRoBot handles
-that.
+The agent receives PR metadata and a pointer to on-disk diffs in the prompt.
+Diffs are written as individual files under `.crobot/diffs-<run-id>/`, with an
+`_index.md` that lists all files with sizes and low-value flags (lock files,
+generated code, vendor). The agent reads selectively, which handles large PRs
+that would exceed context windows. The agent may optionally call
+`list_bot_comments` to check for prior reviews, but must never post findings
+itself -- CRoBot handles that.
 
 ### MCP Server Mode (`crobot serve --mcp`)
 
@@ -438,8 +447,8 @@ field -- no separate setup step is needed.
 |------|-----------------|---------------------------------------------------------------|
 | 1    | CRoBot          | Start MCP server, register 4 tools; deliver review methodology via MCP instructions on connect |
 | 2    | Agent           | Connect as MCP client; receive tools + instructions           |
-| 3    | Agent / CRoBot  | Agent calls `export_pr_context`; CRoBot fetches from platform, returns JSON |
-| 4    | Agent           | Read full files from disk for context                         |
+| 3    | Agent / CRoBot  | Agent calls `export_pr_context`; CRoBot fetches from platform, writes diffs to `.crobot/diffs-<run-id>/`, returns JSON with `diff_dir` |
+| 4    | Agent           | Read diff index and individual file diffs from `diff_dir`; read full source files for context |
 | 5    | Agent / CRoBot  | Agent calls `list_bot_comments`; CRoBot returns existing comments |
 | 6    | Agent           | Formulate findings                                            |
 | 7    | Agent / CRoBot  | Agent calls `apply_review_findings` (dry_run); CRoBot validates, returns results |
@@ -502,7 +511,10 @@ fall back to values from the config file or environment variables.
 
 ### `export-pr-context`
 
-Fetches PR metadata, changed files, and diff hunks as JSON to stdout.
+Fetches PR metadata and changed files as JSON to stdout. In MCP mode, diffs
+are written to disk under `.crobot/diffs-<run-id>/` and the response includes a
+`diff_dir` field pointing to the directory. Agents read individual file diffs
+from that directory instead of receiving them inline.
 
 ```bash
 crobot export-pr-context --workspace <ws> --repo <repo> --pr <number>
@@ -589,9 +601,11 @@ cat findings.json | crobot apply-review-findings \
 ### `review`
 
 Runs an end-to-end AI-powered code review on a pull request or local changes.
-CRoBot spawns an ACP-compatible agent subprocess, sends it the diff with review
-instructions, collects the agent's findings, validates them against the diff,
+CRoBot writes per-file diffs to `.crobot/diffs-<run-id>/`, spawns an
+ACP-compatible agent subprocess, sends it a prompt pointing to the diff
+directory, collects the agent's findings, validates them against the diff,
 deduplicates against existing comments, and posts inline review comments.
+The diff directory is cleaned up automatically after the review completes.
 
 When no PR is specified, CRoBot enters **local mode**: it diffs the working tree
 (committed, staged, and unstaged changes) against a base branch and renders
@@ -1093,7 +1107,8 @@ Add a `.mcp.json` to your project root:
 
 The agent then has direct access to the following tools:
 
-- **`export_pr_context`** -- Fetch PR metadata, changed files, and diff hunks.
+- **`export_pr_context`** -- Fetch PR metadata and changed files. Diffs are written to disk at `diff_dir` (returned in the response) for incremental reading.
+- **`export_local_context`** -- Build PR context from local git state (for pre-push reviews). Also writes diffs to disk.
 - **`get_file_snippet`** -- Retrieve a slice of a file at a specific commit with surrounding context.
 - **`list_bot_comments`** -- List existing CRoBot comments on a PR.
 - **`apply_review_findings`** -- Validate, deduplicate, and post review findings as inline PR comments.

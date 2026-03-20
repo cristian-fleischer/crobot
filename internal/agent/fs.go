@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -70,6 +72,17 @@ func (h *FSHandler) readTextFile(ctx context.Context, params json.RawMessage) (a
 		return nil, fmt.Errorf("agent: fs: invalid path %q", p.Path)
 	}
 	p.Path = cleaned
+
+	// Files under .crobot/ are written to disk (not in git), so read them
+	// directly from the filesystem.
+	if strings.HasPrefix(cleaned, ".crobot/") {
+		absPath := filepath.Join(h.repoDir, cleaned)
+		content, err := os.ReadFile(absPath)
+		if err != nil {
+			return nil, fmt.Errorf("agent: fs: reading %s: %w", cleaned, err)
+		}
+		return map[string]string{"content": string(content)}, nil
+	}
 
 	// Use git show to read the file at the specific commit.
 	ref := fmt.Sprintf("%s:%s", h.headCommit, p.Path)

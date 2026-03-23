@@ -155,6 +155,20 @@ crobot export-skill --agent claude-code    # Install skill
 
 ---
 
+## Learn Go Through CRoBot
+
+One of the risks of vibe coding and agentic engineering is that we defer all
+the knowledge to the agents and lose the opportunity to learn. The code works,
+but we never build a mental model of the language, the patterns, or the
+decisions behind the implementation. This project aims to compensate for that:
+we created a hands-on [Go learning guide](docs/go-guide/index.md) that uses
+CRoBot's own codebase as the teaching material. If you or your team are senior
+engineers picking up Go for the first time, start there -- every lesson walks
+through real code from this repository, covering everything from packages and
+error handling to concurrency and AI agent protocols.
+
+---
+
 # Documentation
 
 Detailed reference documentation for all CRoBot commands, configuration, and

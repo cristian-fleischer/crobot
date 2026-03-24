@@ -55,6 +55,7 @@ func newReviewCmd() *cobra.Command {
 		agentCommand    string
 		philosophyFlag  string
 		baseBranch      string
+		threshold       string
 	)
 
 	cmd := &cobra.Command{
@@ -175,7 +176,12 @@ always runs as dry-run and renders findings to the terminal.`,
 				modelID = cfg.Agent.Model
 			}
 
-			// 8. Resolve review philosophy: CLI flag > env > config > file convention > default.
+			// 8. Resolve severity threshold: CLI flag > env > config.
+			if cmd.Flags().Changed("threshold") {
+				cfg.Review.SeverityThreshold = threshold
+			}
+
+			// 9. Resolve review philosophy: CLI flag > env > config > file convention > default.
 			if cmd.Flags().Changed("review-philosophy") {
 				cfg.Review.PhilosophyPath = philosophyFlag
 			}
@@ -227,6 +233,7 @@ always runs as dry-run and renders findings to the terminal.`,
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
 	cmd.Flags().StringVar(&philosophyFlag, "review-philosophy", "", "Path to a custom review philosophy markdown file")
 	cmd.Flags().StringVar(&baseBranch, "base", "master", "Base branch for local review (used when no PR is specified)")
+	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
 	return cmd
 }
 

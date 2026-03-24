@@ -141,6 +141,24 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name:       "CROBOT_SEVERITY_THRESHOLD env var overrides file",
+			globalPath: "full.yaml",
+			localPath:  "",
+			env: map[string]string{
+				"CROBOT_SEVERITY_THRESHOLD": "info",
+			},
+			check: func(t *testing.T, cfg Config) {
+				t.Helper()
+				if cfg.Review.SeverityThreshold != "info" {
+					t.Errorf("SeverityThreshold = %q, want %q", cfg.Review.SeverityThreshold, "info")
+				}
+				// File values that env didn't override should persist.
+				if cfg.Review.BotLabel != "mybot" {
+					t.Errorf("BotLabel = %q, want %q", cfg.Review.BotLabel, "mybot")
+				}
+			},
+		},
+		{
 			name:       "layering: defaults < global < local",
 			globalPath: "global.yaml",
 			localPath:  "local.yaml",

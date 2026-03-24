@@ -244,6 +244,9 @@ func applyEnv(cfg *Config, lookupEnv EnvLookupFunc) {
 	if v, ok := lookupEnv("CROBOT_DRY_RUN"); ok {
 		cfg.Review.DryRun = parseBool(v)
 	}
+	if v, ok := lookupEnv("CROBOT_SEVERITY_THRESHOLD"); ok {
+		cfg.Review.SeverityThreshold = v
+	}
 	if v, ok := lookupEnv("CROBOT_REVIEW_PHILOSOPHY"); ok {
 		cfg.Review.PhilosophyPath = v
 	}

@@ -29,6 +29,10 @@ crobot review https://github.com/your-org/your-repo/pull/42 --write
 curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
 ```
 
+> Run the setup wizard from your project directory to enable repo-specific
+> config, `.mcp.json` generation, and skill installation. A global-only setup
+> works too if you prefer.
+
 Or [install manually](https://github.com/cristian-fleischer/crobot/releases/latest).
 
 **Review:**
@@ -609,6 +613,7 @@ cat findings.json | crobot apply-review-findings \
 | `--dry-run`      | bool   | no       | `true`  | Validate without posting (default behavior)    |
 | `--write`        | bool   | no       | `false` | Actually post comments to the PR               |
 | `--max-comments` | int    | no       | config  | Max comments to post (`0` = unlimited)         |
+| `--threshold`    | string | no       | config  | Minimum severity: `info`, `warning`, `error`   |
 
 *Required unless set in config file or env vars.
 
@@ -681,6 +686,7 @@ The PR reference (URL or number) can be passed as a positional argument or via
 | `--show-agent-output` | bool   | no       | `false`    | Stream formatted agent output with progress indicator    |
 | `--raw`               | bool   | no       | `false`    | Disable markdown formatting and progress indicator       |
 | `-i`, `--instructions`| string | no       |            | Additional instructions appended to the review prompt    |
+| `--threshold`         | string | no       | config     | Minimum severity: `info`, `warning`, `error`             |
 
 *When omitted, CRoBot enters local mode and reviews local git changes.
 **Not required when a URL is used (workspace and repo are extracted from it)
@@ -948,6 +954,7 @@ Environment variables override config file values.
 | `CROBOT_GITHUB_TOKEN`          | GitHub personal access token                     |              |
 | `CROBOT_MAX_COMMENTS`          | Max comments per run                             | `25`         |
 | `CROBOT_DRY_RUN`               | Default dry-run mode (`true`, `1`, `yes`)        | `true`       |
+| `CROBOT_SEVERITY_THRESHOLD`    | Minimum severity: `info`, `warning`, `error`     | `warning`    |
 | `CROBOT_AGENT`                 | Default agent name for `crobot review`           |              |
 | `CROBOT_MODEL`                 | Default model ID to request from the agent       |              |
 | `CROBOT_TIMEOUT`               | Agent timeout in seconds                         | `600`        |

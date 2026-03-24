@@ -23,6 +23,7 @@ func newApplyCmd() *cobra.Command {
 		dryRun      bool
 		write       bool
 		maxComments int
+		threshold   string
 	)
 
 	cmd := &cobra.Command{
@@ -110,11 +111,17 @@ Use --write to actually post comments.`,
 				mc = maxComments
 			}
 
+			// Determine severity threshold: CLI flag > config.
+			st := cfg.Review.SeverityThreshold
+			if cmd.Flags().Changed("threshold") {
+				st = threshold
+			}
+
 			engine := review.NewEngine(plat, review.EngineConfig{
 				MaxComments:       mc,
 				DryRun:            isDryRun,
 				BotLabel:          cfg.Review.BotLabel,
-				SeverityThreshold: cfg.Review.SeverityThreshold,
+				SeverityThreshold: st,
 			})
 
 			ctx := cmd.Context()
@@ -143,6 +150,7 @@ Use --write to actually post comments.`,
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate and show what would be posted without posting")
 	cmd.Flags().BoolVar(&write, "write", false, "Actually post comments to the PR")
 	cmd.Flags().IntVar(&maxComments, "max-comments", 0, "Maximum number of comments to post (0 = unlimited; omit to use config default)")
+	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
 
 	return cmd
 }

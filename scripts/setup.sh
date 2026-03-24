@@ -1012,6 +1012,16 @@ write_local_config() {
   else
     success "Wrote local config: $LOCAL_CONFIG"
   fi
+
+  # Always offer to gitignore .crobot/ (ephemeral diff data), even without secrets.
+  if [[ -f ".gitignore" ]] && ! grep -qx '.crobot/' .gitignore 2>/dev/null; then
+    if confirm "Add .crobot/ to .gitignore? (recommended -- contains ephemeral review data)"; then
+      echo ".crobot/" >> .gitignore
+      success "Added .crobot/ to .gitignore"
+    else
+      warn "Remember to add .crobot/ to .gitignore to avoid committing ephemeral review data."
+    fi
+  fi
 }
 
 check_gitignore() {

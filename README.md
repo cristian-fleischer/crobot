@@ -121,7 +121,7 @@ The agent calls individual CRoBot commands as discrete steps. Install a skill
 to teach the agent the workflow automatically.
 
 ```bash
-crobot export-skill --agent claude-code    # Install skill
+crobot export-skill    # Install skill (.agents/skills/ — works with all agents)
 # Then use /review-pr <url> in your agent session
 ```
 
@@ -747,24 +747,26 @@ should run this command first.
 
 ### `export-skill`
 
-Exports the CRoBot review skill for an AI agent. The skill teaches agents the
-full code review workflow via a slash command.
+Installs the CRoBot review skill to `.agents/skills/review-pr/SKILL.md`, the
+standard [Agent Skills](https://agentskills.io) location. This path is
+auto-discovered by all compatible agents (Claude Code, Codex, Gemini CLI,
+GitHub Copilot, Cursor, OpenCode, and 30+ others).
 
 ```bash
-# Print to stdout
+# Install skill (current project)
 crobot export-skill
 
-# Install for a specific agent
-crobot export-skill --agent claude-code
+# Install globally (home directory, all projects)
+crobot export-skill --global
 
-# Install globally (home directory)
-crobot export-skill --agent claude-code --global
+# Print skill to stdout (inspect or pipe)
+crobot export-skill --print
 ```
 
-| Flag      | Type   | Required | Default | Description                                            |
-|-----------|--------|----------|---------|--------------------------------------------------------|
-| `--agent` | string | no       |         | Target agent: `claude-code`, `codex`, `opencode`, `generic` |
-| `--global`| bool   | no       | `false` | Install to home directory (available across all projects)   |
+| Flag       | Type | Required | Default | Description                                             |
+|------------|------|----------|---------|---------------------------------------------------------|
+| `--global` | bool | no       | `false` | Install to home directory (available across all projects)|
+| `--print`  | bool | no       | `false` | Print skill to stdout instead of installing              |
 
 ### `export-philosophy`
 
@@ -1148,32 +1150,24 @@ MCP instructions field.
 ### CLI Agents (Skill / Slash Command)
 
 For agents using CLI commands, CRoBot includes a built-in review skill that you
-can install with a single command. The skill teaches the agent the full review
-workflow: load instructions, perform the review (with multi-agent parallelism
-when possible), and post findings.
+can install with a single command. The skill follows the
+[Agent Skills](https://agentskills.io) open standard and is auto-discovered by
+all compatible agents (Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor,
+OpenCode, and 30+ others).
 
 ```bash
-# Install for Claude Code (current project)
-crobot export-skill --agent claude-code
+# Install skill (current project)
+crobot export-skill
 
-# Install for Claude Code (globally, all projects)
-crobot export-skill --agent claude-code --global
-
-# Install for other agents
-crobot export-skill --agent codex
-crobot export-skill --agent opencode
-crobot export-skill --agent generic
+# Install globally (all projects)
+crobot export-skill --global
 
 # Print skill to stdout (inspect or pipe)
-crobot export-skill
+crobot export-skill --print
 ```
 
-| Agent          | Install Path                                    |
-|----------------|-------------------------------------------------|
-| `claude-code`  | `.claude/skills/review-pr/SKILL.md`             |
-| `codex`        | `.codex/skills/review-pr/SKILL.md`              |
-| `opencode`     | `.opencode/skills/review-pr/SKILL.md`           |
-| `generic`      | `.agents/skills/review-pr.md`                   |
+The skill is installed to `.agents/skills/review-pr/SKILL.md`, the standard
+cross-agent discovery path.
 
 Once installed, use the `/review-pr <pr-url-or-number>` slash command in your
 agent session. The skill instructs the agent to:

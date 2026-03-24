@@ -1107,27 +1107,13 @@ EOF
 
 offer_skill_install() {
   if ! command -v crobot &>/dev/null; then
-    info "Tip: once crobot is installed, run 'crobot export-skill --agent <target>' to install the review skill."
+    info "Tip: once crobot is installed, run 'crobot export-skill' to install the review skill."
     return
   fi
 
   echo ""
-  if confirm "Install the CRoBot review skill for your AI agent?"; then
-    local target
-    target=$(select_one "Which agent?" \
-      "Claude Code" \
-      "Codex CLI" \
-      "OpenCode" \
-      "Generic")
-
-    case "$target" in
-      "Claude Code") target="claude-code" ;;
-      "Codex CLI")   target="codex" ;;
-      "OpenCode")    target="opencode" ;;
-      "Generic")     target="generic" ;;
-    esac
-
-    crobot export-skill --agent "$target"
+  if confirm "Install the CRoBot review skill? (installs to .agents/skills/ — works with all agents)"; then
+    crobot export-skill
   fi
 }
 

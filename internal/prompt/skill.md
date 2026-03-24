@@ -2,6 +2,7 @@
 name: review-pr
 description: Run an AI-powered code review on a pull request or local changes using CRoBot
 argument-hint: [pr-url-or-number]
+license: MIT
 ---
 
 # CRoBot Code Review

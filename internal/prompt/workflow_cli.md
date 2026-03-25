@@ -72,7 +72,7 @@ Save it to a temporary file (e.g., `/tmp/review-findings.json`).
 - Leave `fingerprint` empty (CRoBot auto-generates).
 - Quality over quantity — zero findings is valid if the code is sound.
 
-### 6. Validate and post (PR mode) or present (local mode)
+### 6. Validate and post (PR mode) or render (local mode)
 
 **For a PR** — always dry-run first:
 ```bash
@@ -84,5 +84,10 @@ If validation fails, fix findings and re-run. When dry-run passes:
 crobot apply-review-findings --pr <number> --input /tmp/review-findings.json --write
 ```
 
-**For local changes** — there is no PR to post to. Present the findings
-directly to the user, grouped by severity (errors first).
+**For local changes:**
+```bash
+crobot apply-review-findings --local --input /tmp/review-findings.json
+```
+
+This validates findings against the local diff and renders them in the terminal
+with diff context. No PR is needed.

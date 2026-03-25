@@ -9,6 +9,7 @@ import (
 
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
+	localplatform "github.com/cristian-fleischer/crobot/internal/platform/local"
 	"github.com/cristian-fleischer/crobot/internal/review"
 	"github.com/spf13/cobra"
 )
@@ -24,40 +25,46 @@ func newApplyCmd() *cobra.Command {
 		write       bool
 		maxComments int
 		threshold   string
+		local       bool
+		base        string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "apply-review-findings",
-		Short: "Apply review findings as PR inline comments",
+		Short: "Apply review findings as PR comments or render locally",
 		Long: `Takes ReviewFinding[] JSON and posts them as inline PR comments.
 
 By default, runs in dry-run mode (validates and shows what would be posted).
-Use --write to actually post comments.`,
+Use --write to actually post comments.
+
+Use --local to validate and render findings in the terminal without a PR.
+Local mode always runs as dry-run and renders findings with diff context.`,
 		Example: `  # Dry run (default)
-  crobot apply-review-findings \
-    --workspace myteam --repo my-service --pr 42 \
-    --input findings.json --dry-run
+  crobot apply-review-findings --pr 42 --input findings.json --dry-run
 
   # Write
-  crobot apply-review-findings \
-    --workspace myteam --repo my-service --pr 42 \
-    --input findings.json --write
+  crobot apply-review-findings --pr 42 --input findings.json --write
+
+  # Local mode (render to terminal)
+  crobot apply-review-findings --local --input findings.json
 
   # Read from stdin
-  cat findings.json | crobot apply-review-findings \
-    --workspace myteam --repo my-service --pr 42 \
-    --input - --write`,
+  cat findings.json | crobot apply-review-findings --pr 42 --input - --write`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if input == "" {
 				return fmt.Errorf("--input is required (use - for stdin)")
 			}
-			if dryRun && write {
+			if local && write {
+				return fmt.Errorf("--local and --write are mutually exclusive (local mode is always dry-run)")
+			}
+			if !local && dryRun && write {
 				return fmt.Errorf("--dry-run and --write are mutually exclusive")
 			}
 
-			// Dry-run is the default; --write overrides it. Explicitly
-			// passing --dry-run is supported for clarity in scripts.
 			isDryRun := !write
+			if local {
+				isDryRun = true
+			}
 
 			// Read findings from file or stdin.
 			const maxInputSize = 10 << 20 // 10 MB
@@ -87,25 +94,42 @@ Use --write to actually post comments.`,
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			workspace, repo = resolveWorkspaceRepo(workspace, repo, cfg)
+			var plat platform.Platform
+			var req platform.PRRequest
 
-			if workspace == "" || repo == "" || pr <= 0 {
-				return fmt.Errorf("--workspace, --repo, and --pr are required")
-			}
+			if local {
+				localPlat := localplatform.New(base, ".")
+				plat = localPlat
+				req = platform.PRRequest{
+					Workspace: "local",
+					Repo:      localPlat.RepoName(),
+					PRNumber:  0,
+				}
+			} else {
+				workspace, repo = resolveWorkspaceRepo(workspace, repo, cfg)
 
-			slog.Debug("applying review findings",
-				"workspace", workspace, "repo", repo, "pr", pr,
-				"input", input, "dry_run", isDryRun,
-			)
+				if workspace == "" || repo == "" || pr <= 0 {
+					return fmt.Errorf("--workspace, --repo, and --pr are required (or use --local)")
+				}
 
-			plat, err := buildPlatform(cfg)
-			if err != nil {
-				return fmt.Errorf("creating platform client: %w", err)
+				slog.Debug("applying review findings",
+					"workspace", workspace, "repo", repo, "pr", pr,
+					"input", input, "dry_run", isDryRun,
+				)
+
+				plat, err = buildPlatform(cfg)
+				if err != nil {
+					return fmt.Errorf("creating platform client: %w", err)
+				}
+
+				req = platform.PRRequest{
+					Workspace: workspace,
+					Repo:      repo,
+					PRNumber:  pr,
+				}
 			}
 
 			// Determine max comments: CLI flag > config > default.
-			// Only override from CLI if the flag was explicitly set to a
-			// positive value; 0 means unlimited when set explicitly.
 			mc := cfg.Review.MaxComments
 			if cmd.Flags().Changed("max-comments") {
 				mc = maxComments
@@ -125,13 +149,19 @@ Use --write to actually post comments.`,
 			})
 
 			ctx := cmd.Context()
-			result, err := engine.Run(ctx, platform.PRRequest{
-				Workspace: workspace,
-				Repo:      repo,
-				PRNumber:  pr,
-			}, findings)
+			result, err := engine.Run(ctx, req, findings)
 			if err != nil {
 				return fmt.Errorf("running review engine: %w", err)
+			}
+
+			// In local mode, render findings to stderr with diff context.
+			if local && len(result.Posted) > 0 {
+				prCtx, _ := plat.GetPRContext(ctx, req)
+				var hunks []platform.DiffHunk
+				if prCtx != nil {
+					hunks = prCtx.DiffHunks
+				}
+				RenderFindings(result.Posted, hunks, os.Stderr, false)
 			}
 
 			data, err := json.MarshalIndent(result, "", "  ")
@@ -151,6 +181,8 @@ Use --write to actually post comments.`,
 	cmd.Flags().BoolVar(&write, "write", false, "Actually post comments to the PR")
 	cmd.Flags().IntVar(&maxComments, "max-comments", 0, "Maximum number of comments to post (0 = unlimited; omit to use config default)")
 	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
+	cmd.Flags().BoolVar(&local, "local", false, "Validate and render findings locally (no PR needed)")
+	cmd.Flags().StringVar(&base, "base", "master", "Base branch for local mode (used with --local)")
 
 	return cmd
 }

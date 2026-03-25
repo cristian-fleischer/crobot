@@ -35,4 +35,7 @@ crobot apply-review-findings --pr <number> --input findings.json --dry-run
 
 # Post comments
 crobot apply-review-findings --pr <number> --input findings.json --write
+
+# Local mode (validate and render to terminal)
+crobot apply-review-findings --local --input findings.json
 ```

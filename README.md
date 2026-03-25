@@ -597,37 +597,38 @@ crobot list-bot-comments --workspace <ws> --repo <repo> --pr <number>
 
 ### `apply-review-findings`
 
-Takes `ReviewFinding[]` JSON and posts them as inline PR comments.
+Takes `ReviewFinding[]` JSON and posts them as inline PR comments, or validates
+and renders them locally.
 
 ```bash
 # Dry run (default)
-crobot apply-review-findings \
-  --workspace <ws> --repo <repo> --pr <number> \
-  --input findings.json --dry-run
+crobot apply-review-findings --pr 42 --input findings.json --dry-run
 
 # Post comments
-crobot apply-review-findings \
-  --workspace <ws> --repo <repo> --pr <number> \
-  --input findings.json --write
+crobot apply-review-findings --pr 42 --input findings.json --write
+
+# Local mode (validate and render to terminal)
+crobot apply-review-findings --local --input findings.json
 
 # Read from stdin with comment cap
-cat findings.json | crobot apply-review-findings \
-  --workspace <ws> --repo <repo> --pr <number> \
-  --input - --write --max-comments 10
+cat findings.json | crobot apply-review-findings --pr 42 --input - --write --max-comments 10
 ```
 
-| Flag             | Type   | Required | Default | Description                                    |
-|------------------|--------|----------|---------|------------------------------------------------|
-| `--workspace`    | string | no*      |         | Workspace/organization slug                    |
-| `--repo`         | string | no*      |         | Repository slug                                |
-| `--pr`           | int    | yes      |         | Pull request number                            |
-| `--input`        | string | yes      |         | Path to findings JSON file (`-` for stdin)     |
-| `--dry-run`      | bool   | no       | `true`  | Validate without posting (default behavior)    |
-| `--write`        | bool   | no       | `false` | Actually post comments to the PR               |
-| `--max-comments` | int    | no       | config  | Max comments to post (`0` = unlimited)         |
-| `--threshold`    | string | no       | config  | Minimum severity: `info`, `warning`, `error`   |
+| Flag             | Type   | Required | Default  | Description                                      |
+|------------------|--------|----------|----------|--------------------------------------------------|
+| `--workspace`    | string | no*      |          | Workspace/organization slug                      |
+| `--repo`         | string | no*      |          | Repository slug                                  |
+| `--pr`           | int    | no**     |          | Pull request number                              |
+| `--local`        | bool   | no**     | `false`  | Validate and render findings locally (no PR)     |
+| `--base`         | string | no       | `master` | Base branch for local mode (used with --local)   |
+| `--input`        | string | yes      |          | Path to findings JSON file (`-` for stdin)       |
+| `--dry-run`      | bool   | no       | `true`   | Validate without posting (default behavior)      |
+| `--write`        | bool   | no       | `false`  | Actually post comments to the PR                 |
+| `--max-comments` | int    | no       | config   | Max comments to post (`0` = unlimited)           |
+| `--threshold`    | string | no       | config   | Minimum severity: `info`, `warning`, `error`     |
 
 *Required unless set in config file or env vars.
+**Either `--pr` or `--local` must be specified.
 
 ### `review`
 

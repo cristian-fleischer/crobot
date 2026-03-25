@@ -35,5 +35,5 @@ When reviewing local changes that haven't been pushed yet:
 2. Read the diff and changed files to understand the scope of changes.
 3. For each changed file, read the full file from disk for additional context.
 4. Formulate findings as a JSON array of ReviewFinding objects.
-5. Output the findings directly — do NOT call `apply_review_findings` since
-   there is no pull request to post to.
+5. Present the findings directly to the user, grouped by severity (errors first,
+   then warnings, then info). There is no pull request to post to in local mode.

@@ -42,8 +42,25 @@ crobot export-pr-context --local
 This writes per-file diffs to `.crobot/diffs-<run-id>/` and returns JSON with a
 `diff_dir` field. Read the diff index and individual file diffs from that directory.
 
-### Step 3 — Review and post
+### Step 3 — Review the code
 
-Follow the workflow from Step 1 to review the code and produce findings.
-The workflow covers: understanding the changes, reviewing with optional
-sub-agents, formulating findings, and validating/posting them via CRoBot.
+Follow the workflow from the review instructions (Step 1) to:
+1. Understand the changes (read full files, trace call chains)
+2. Check for existing bot comments (PR mode only: `crobot list-bot-comments --pr <number>`)
+3. Review all changes — use sub-agents if available for higher quality
+4. Formulate findings as a ReviewFinding JSON array and save to a temp file
+
+### Step 4 — Apply findings
+
+**If reviewing a PR** — always dry-run first, then post:
+```bash
+crobot apply-review-findings --pr $ARGUMENTS --input /tmp/review-findings.json --dry-run
+crobot apply-review-findings --pr $ARGUMENTS --input /tmp/review-findings.json --write
+```
+
+**If reviewing local changes** — validate and render to terminal:
+```bash
+crobot apply-review-findings --local --input /tmp/review-findings.json
+```
+
+Report the results to the user.

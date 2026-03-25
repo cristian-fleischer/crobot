@@ -106,9 +106,10 @@ func CLIInstructionsWithPhilosophy(philosophy string) string {
 	return cliInstructions(philosophy)
 }
 
-// cliInstructions assembles CLI instructions: workflow first, then reference.
+// cliInstructions assembles CLI instructions: core reference, workflow (which
+// includes multi-agent guidance inline), CLI command reference, and philosophy.
 func cliInstructions(philosophy string) string {
-	return coreInstructions + "\n" + cliWorkflow + "\n" + multiAgent + "\n" + cliCommands + "\n" + philosophyContent(philosophy)
+	return coreInstructions + "\n" + cliWorkflow + "\n" + cliCommands + "\n" + philosophyContent(philosophy)
 }
 
 func philosophyContent(philosophy string) string {

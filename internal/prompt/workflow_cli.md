@@ -48,16 +48,26 @@ performance, data integrity, error handling.
 **If you can spawn sub-agents**, distribute the review to specialist agents in
 parallel — this produces higher-quality results than a single pass:
 
-- **Security** — injection, auth, credential exposure, input validation
-- **Logic & correctness** — bugs, null dereferences, edge cases, error handling
-- **Architecture** — pattern violations, coupling, misplaced responsibilities
-- **Performance** — hot-path complexity, N+1 queries, unbounded allocations
-- **Data integrity** — missing transactions, partial writes, inconsistent state
+- **Security** — injection vectors, auth issues, credential exposure, insecure
+  defaults, input validation at trust boundaries
+- **Logic & correctness** — bugs, off-by-one errors, nil/null dereferences,
+  race conditions, edge cases, error handling gaps
+- **Architecture** — pattern violations, misplaced responsibilities, tight
+  coupling, broken abstractions, API contract consistency
+- **Performance** — hot-path complexity, unbounded allocations, N+1 queries,
+  missing indexes, unnecessary work in loops
+- **Data integrity** — missing transactions, partial writes, inconsistent state,
+  schema mismatches
 
-Give each sub-agent the diff context from Step 1, the ReviewFinding schema, their
-focus area, and filesystem access for full file reads. Collect all findings,
-deduplicate, resolve conflicts, and remove low-quality items. Add any
-cross-cutting findings the specialists missed.
+Include other specialists if there are other review concerns that need to be
+addressed. Give each sub-agent the diff context from Step 1, the ReviewFinding
+schema, their focus area, and filesystem access for full file reads.
+
+You (the lead agent) should:
+1. Distribute the review to specialists with their focus area.
+2. Collect findings, deduplicate, resolve conflicts, remove low-quality items.
+3. Add any cross-cutting findings the specialists missed.
+4. Produce the final consolidated JSON array of ReviewFinding objects.
 
 If you cannot spawn sub-agents, review all concerns yourself in a single pass.
 

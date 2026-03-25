@@ -58,12 +58,15 @@ type FailedComment struct {
 
 // ReviewSummary provides aggregate counts for the review run.
 type ReviewSummary struct {
-	Total     int  `json:"total"`
-	Posted    int  `json:"posted"`
-	Skipped   int  `json:"skipped"`
-	Failed    int  `json:"failed"`
-	Duplicate int  `json:"duplicate"`
-	MaxCapped bool `json:"max_capped"`
+	Total      int    `json:"total"`
+	Posted     int    `json:"posted"`
+	Skipped    int    `json:"skipped"`
+	Failed     int    `json:"failed"`
+	Duplicate  int    `json:"duplicate"`
+	MaxCapped  bool   `json:"max_capped"`
+	Agent      string `json:"agent,omitempty"`
+	Model      string `json:"model,omitempty"`
+	DurationMs int64  `json:"duration_ms,omitempty"`
 }
 
 // NewEngine creates a new review engine with the given platform and config.

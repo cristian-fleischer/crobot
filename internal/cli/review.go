@@ -240,6 +240,8 @@ always runs as dry-run and renders findings to the terminal.`,
 // runReview executes the full AI-powered review pipeline: fetch PR context,
 // run the agent, extract findings, and post comments via the review engine.
 func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, error) {
+	reviewStart := time.Now()
+
 	slog.Debug("starting review",
 		"workspace", opts.PRRequest.Workspace, "repo", opts.PRRequest.Repo,
 		"pr", opts.PRRequest.PRNumber, "agent", opts.AgentCfg.Name,
@@ -396,7 +398,12 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 		return nil, fmt.Errorf("running review engine: %w", err)
 	}
 
-	// 7. Print rendered comments to stderr for human preview.
+	// 7. Populate summary metadata.
+	engineResult.Summary.Agent = opts.AgentCfg.Name
+	engineResult.Summary.Model = session.CurrentModel
+	engineResult.Summary.DurationMs = time.Since(reviewStart).Milliseconds()
+
+	// 8. Print rendered comments to stderr for human preview.
 	if (opts.LocalMode || opts.ShowAgentOutput) && len(engineResult.Posted) > 0 {
 		RenderFindings(engineResult.Posted, prCtx.DiffHunks, os.Stderr, opts.RawOutput)
 	}

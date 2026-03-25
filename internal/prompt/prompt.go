@@ -94,14 +94,26 @@ func MCPInstructionsWithPhilosophy(philosophy string) string {
 }
 
 // CLIInstructions returns the review instructions for CLI-based agents.
-// This includes the full CLI command reference since CLI agents need to
-// know exact command syntax.
+// Workflow comes first (actionable steps), followed by reference material
+// (schema, rules, philosophy) and CLI command syntax.
 func CLIInstructions() string {
-	return base("") + "\n" + cliCommands + "\n" + cliWorkflow
+	return cliInstructions("")
 }
 
 // CLIInstructionsWithPhilosophy returns CLI instructions with a custom
 // review philosophy.
 func CLIInstructionsWithPhilosophy(philosophy string) string {
-	return base(philosophy) + "\n" + cliCommands + "\n" + cliWorkflow
+	return cliInstructions(philosophy)
+}
+
+// cliInstructions assembles CLI instructions: workflow first, then reference.
+func cliInstructions(philosophy string) string {
+	return coreInstructions + "\n" + cliWorkflow + "\n" + multiAgent + "\n" + cliCommands + "\n" + philosophyContent(philosophy)
+}
+
+func philosophyContent(philosophy string) string {
+	if philosophy != "" {
+		return philosophy
+	}
+	return defaultPhilosophy
 }

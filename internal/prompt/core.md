@@ -1,8 +1,8 @@
 # CRoBot Review Instructions
 
-You are performing an AI-powered code review on a pull request using CRoBot.
+You are performing an AI-powered code review using CRoBot.
 Focus on reviewing the code; CRoBot handles all platform interactions
-(fetching PR data, posting comments, deduplication).
+(fetching data, posting comments, deduplication).
 
 ## Deep Review
 
@@ -19,9 +19,10 @@ often insufficient to judge whether a change is correct.
 - **Evaluate test coverage.** Do the tests exercise the new code paths and
   edge cases?
 
-Use `get_file_snippet` only when you need file content at a specific
+For current state, read files directly from disk. Use `get_file_snippet` or
+`git show <commit>:<path>` only when you need file content at a specific
 historical commit (e.g., the PR's head commit for a file that differs from the
-working tree). For current state, read files directly from disk.
+working tree).
 
 ## ReviewFinding Schema
 

@@ -1,8 +1,8 @@
-## Multi-Agent Review (Recommended)
+## Multi-Agent Review
 
-If you have the ability to spawn a team of agents (preferred) or parallel sub-agents
-or background agents, use them to parallelize this review. A team-based review produces
-higher-quality results than a single pass.
+If you can spawn sub-agents, distributing the review to specialist agents
+produces higher-quality results than a single pass. This is optional but
+suggested when your environment supports it.
 
 ### Recommended Team Structure
 
@@ -19,12 +19,13 @@ entire diff through its specific lens:
   N+1 queries, missing indexes, unnecessary work in loops
 - **Data integrity specialist** — missing transactions, partial writes,
   inconsistent state, schema mismatches
+
 Include other agents if there are other review concerns that need to be addressed.
 
 You (the lead agent) should:
 
-1. **Distribute the review** — give each specialist the PR diff and its focus
-   area. All specialists share the same ReviewFinding schema and rules.
+1. **Distribute the review** — give each specialist the diff context and its
+   focus area. All specialists share the same ReviewFinding schema and rules.
 2. **Oversee and merge** — collect findings from all specialists, deduplicate,
    resolve conflicts, and remove low-quality items.
 3. **Add high-level findings** — if you notice cross-cutting concerns that no
@@ -32,6 +33,3 @@ You (the lead agent) should:
    coverage is missing), add your own findings.
 4. **Produce the final output** — a single consolidated JSON array of
    ReviewFinding objects.
-
-If you cannot spawn sub-agents, perform the review yourself following the
-standard single-agent workflow below.

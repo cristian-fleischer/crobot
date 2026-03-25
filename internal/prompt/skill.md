@@ -7,38 +7,43 @@ license: MIT
 
 # CRoBot Code Review
 
-You are performing a code review using CRoBot, a CLI tool that handles PR data
-fetching, finding validation, deduplication, and comment posting.
+You are performing a code review using CRoBot. CRoBot handles data fetching,
+finding validation, deduplication, and comment posting. You do the actual review.
 
-This skill supports two modes:
-- **PR review** (primary): Review a pull request by URL or number.
-- **Local review**: Review uncommitted local changes before pushing. Invoked when
-  no PR argument is provided.
+**Do NOT use `crobot review`.** That command is for non-interactive automated
+pipelines. Follow the procedure below.
 
-## Step 1: Load Review Instructions
+## Procedure
 
-IMPORTANT: You MUST run the following command and read its output carefully
-before proceeding. It contains the review methodology, required JSON schema,
-severity guidelines, workflow steps, and rules.
+Follow these steps **in order**. Do not skip steps.
+
+### Step 1 — Load review instructions
+
+Run this command and read the output carefully. It contains the ReviewFinding
+JSON schema, severity guidelines, rules, review philosophy, and the detailed
+workflow with all CRoBot commands.
 
 ```bash
 crobot review-instructions
 ```
 
-## Step 2: Perform the Review
+### Step 2 — Export context
 
-Follow the workflow from the instructions above to review the code changes.
+**If `$ARGUMENTS` is a PR URL or number:**
+```bash
+crobot export-pr-context --pr $ARGUMENTS
+```
 
-If `$ARGUMENTS` is provided, review that PR. If no argument is provided, review
-local changes (committed, staged, and unstaged) against the base branch.
+**If `$ARGUMENTS` is empty (local review):**
+```bash
+crobot export-pr-context --local
+```
 
-If you have the ability to spawn a team of agents (preferred) or parallel sub-agents or background agents, use them to
-parallelize the review — one specialist per concern (security, architecture,
-logic, performance, data integrity, and so on). Collect and merge their findings into a
-single consolidated output.
+This writes per-file diffs to `.crobot/diffs-<run-id>/` and returns JSON with a
+`diff_dir` field. Read the diff index and individual file diffs from that directory.
 
-## Step 3: Post Findings
+### Step 3 — Review and post
 
-Always dry-run first to validate, then post with `--write` if the dry-run
-passes. For local reviews, findings are rendered to the terminal only (no PR to
-post to).
+Follow the workflow from Step 1 to review the code and produce findings.
+The workflow covers: understanding the changes, reviewing with optional
+sub-agents, formulating findings, and validating/posting them via CRoBot.

@@ -529,22 +529,34 @@ fall back to values from the config file or environment variables.
 
 ### `export-pr-context`
 
-Fetches PR metadata and changed files as JSON to stdout. In MCP mode, diffs
-are written to disk under `.crobot/diffs-<run-id>/` and the response includes a
-`diff_dir` field pointing to the directory. Agents read individual file diffs
-from that directory instead of receiving them inline.
+Exports context (metadata, changed files, diff hunks) as JSON to stdout.
+Per-file diffs are written to `.crobot/diffs-<run-id>/` and the response
+includes a `diff_dir` field pointing to the directory. Agents read individual
+file diffs from that directory instead of receiving them inline.
+
+Use `--local` to export local git changes instead of a PR.
 
 ```bash
-crobot export-pr-context --workspace <ws> --repo <repo> --pr <number>
+# PR context
+crobot export-pr-context --pr 42
+
+# Local changes against master
+crobot export-pr-context --local
+
+# Local changes against a different base branch
+crobot export-pr-context --local --base main
 ```
 
-| Flag          | Type   | Required | Default | Description                                    |
-|---------------|--------|----------|---------|------------------------------------------------|
-| `--workspace` | string | no*      |         | Workspace/organization slug                    |
-| `--repo`      | string | no*      |         | Repository slug                                |
-| `--pr`        | int    | yes      |         | Pull request number                            |
+| Flag          | Type   | Required | Default  | Description                                    |
+|---------------|--------|----------|----------|------------------------------------------------|
+| `--workspace` | string | no*      |          | Workspace/organization slug                    |
+| `--repo`      | string | no*      |          | Repository slug                                |
+| `--pr`        | int    | no**     |          | Pull request number                            |
+| `--local`     | bool   | no**     | `false`  | Export local git changes instead of a PR        |
+| `--base`      | string | no       | `master` | Base branch for local mode (used with --local) |
 
 *Required unless set in config file or env vars.
+**Either `--pr` or `--local` must be specified.
 
 ### `get-file-snippet`
 

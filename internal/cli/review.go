@@ -55,6 +55,7 @@ func newReviewCmd() *cobra.Command {
 		agentCommand    string
 		philosophyFlag  string
 		baseBranch      string
+		uncommitted     bool
 		threshold       string
 	)
 
@@ -79,6 +80,9 @@ always runs as dry-run and renders findings to the terminal.`,
 
   # Review local changes against a different base branch
   crobot review --base main
+
+  # Review only uncommitted changes
+  crobot review --uncommitted
 
   # Using a PR URL (workspace and repo deduced automatically)
   crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
@@ -124,7 +128,12 @@ always runs as dry-run and renders findings to the terminal.`,
 			var plat platform.Platform
 
 			if isLocalMode {
-				localPlat := localplatform.New(baseBranch, ".")
+				var localPlat *localplatform.Provider
+				if uncommitted {
+					localPlat = localplatform.NewUncommitted(".")
+				} else {
+					localPlat = localplatform.New(baseBranch, ".")
+				}
 				plat = localPlat
 				isDryRun = true // local mode never posts
 				pr = &platform.PRRequest{
@@ -233,6 +242,7 @@ always runs as dry-run and renders findings to the terminal.`,
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
 	cmd.Flags().StringVar(&philosophyFlag, "review-philosophy", "", "Path to a custom review philosophy markdown file")
 	cmd.Flags().StringVar(&baseBranch, "base", "master", "Base branch for local review (used when no PR is specified)")
+	cmd.Flags().BoolVar(&uncommitted, "uncommitted", false, "Only diff uncommitted changes against HEAD (local mode)")
 	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
 	return cmd
 }

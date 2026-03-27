@@ -23,11 +23,12 @@ type cliExportResponse struct {
 // newExportCmd creates the export-pr-context subcommand.
 func newExportCmd() *cobra.Command {
 	var (
-		workspace string
-		repo      string
-		pr        int
-		local     bool
-		base      string
+		workspace   string
+		repo        string
+		pr          int
+		local       bool
+		uncommitted bool
+		base        string
 	)
 
 	cmd := &cobra.Command{
@@ -45,7 +46,10 @@ Use --local to review local git changes instead of a PR.`,
   crobot export-pr-context --local
 
   # Export local changes against a different base branch
-  crobot export-pr-context --local --base main`,
+  crobot export-pr-context --local --base main
+
+  # Export only uncommitted changes
+  crobot export-pr-context --local --uncommitted`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.LoadDefault()
 			if err != nil {
@@ -55,7 +59,11 @@ Use --local to review local git changes instead of a PR.`,
 			var plat platform.Platform
 
 			if local {
-				plat = localplatform.New(base, ".")
+				if uncommitted {
+					plat = localplatform.NewUncommitted(".")
+				} else {
+					plat = localplatform.New(base, ".")
+				}
 			} else {
 				workspace, repo = resolveWorkspaceRepo(workspace, repo, cfg)
 
@@ -112,6 +120,7 @@ Use --local to review local git changes instead of a PR.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "Repository slug")
 	cmd.Flags().IntVar(&pr, "pr", 0, "Pull request number")
 	cmd.Flags().BoolVar(&local, "local", false, "Export local git changes instead of a PR")
+	cmd.Flags().BoolVar(&uncommitted, "uncommitted", false, "Only diff uncommitted changes against HEAD (used with --local)")
 	cmd.Flags().StringVar(&base, "base", "master", "Base branch for local mode (used with --local)")
 
 	return cmd

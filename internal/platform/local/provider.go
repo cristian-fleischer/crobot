@@ -17,8 +17,9 @@ import (
 // It diffs the working tree (including staged and unstaged changes) against
 // a base branch to produce a PRContext for review.
 type Provider struct {
-	baseBranch string
-	repoDir    string
+	baseBranch  string
+	repoDir     string
+	uncommitted bool
 }
 
 // New creates a local provider that diffs against the given base branch.
@@ -30,17 +31,22 @@ func New(baseBranch, repoDir string) *Provider {
 	}
 }
 
-// GetPRContext builds a PRContext from local git state. It diffs the working
-// tree against the merge-base of the base branch, capturing all committed,
-// staged, and unstaged changes.
+// NewUncommitted creates a local provider that diffs only uncommitted changes
+// (staged and unstaged) against HEAD.
+func NewUncommitted(repoDir string) *Provider {
+	return &Provider{
+		repoDir:     repoDir,
+		uncommitted: true,
+	}
+}
+
+// GetPRContext builds a PRContext from local git state. By default it diffs the
+// working tree against the merge-base of the base branch, capturing all
+// committed, staged, and unstaged changes. When uncommitted mode is enabled, it
+// diffs only uncommitted changes (staged + unstaged) against HEAD.
 func (p *Provider) GetPRContext(ctx context.Context, _ platform.PRRequest) (*platform.PRContext, error) {
 	if err := p.validate(ctx); err != nil {
 		return nil, err
-	}
-
-	mergeBase, err := p.git(ctx, "merge-base", p.baseBranch, "HEAD")
-	if err != nil {
-		return nil, fmt.Errorf("finding merge-base with %s: %w (is %q a valid branch?)", p.baseBranch, err, p.baseBranch)
 	}
 
 	head, err := p.git(ctx, "rev-parse", "HEAD")
@@ -55,14 +61,27 @@ func (p *Provider) GetPRContext(ctx context.Context, _ platform.PRRequest) (*pla
 
 	author, _ := p.git(ctx, "config", "user.name")
 
-	// Diff working tree against merge-base (captures committed + staged + unstaged).
-	nameStatus, err := p.git(ctx, "diff", "--name-status", mergeBase)
+	// Determine the diff base: HEAD for uncommitted mode, merge-base otherwise.
+	diffBase := head
+	targetBranch := branch
+	title := "Local review (uncommitted): " + branch
+	if !p.uncommitted {
+		mergeBase, err := p.git(ctx, "merge-base", p.baseBranch, "HEAD")
+		if err != nil {
+			return nil, fmt.Errorf("finding merge-base with %s: %w (is %q a valid branch?)", p.baseBranch, err, p.baseBranch)
+		}
+		diffBase = mergeBase
+		targetBranch = p.baseBranch
+		title = "Local review: " + branch
+	}
+
+	nameStatus, err := p.git(ctx, "diff", "--name-status", diffBase)
 	if err != nil {
 		return nil, fmt.Errorf("getting changed files: %w", err)
 	}
 	files := parseNameStatus(nameStatus)
 
-	rawDiff, err := p.git(ctx, "diff", mergeBase)
+	rawDiff, err := p.git(ctx, "diff", diffBase)
 	if err != nil {
 		return nil, fmt.Errorf("getting diff: %w", err)
 	}
@@ -74,13 +93,13 @@ func (p *Provider) GetPRContext(ctx context.Context, _ platform.PRRequest) (*pla
 
 	return &platform.PRContext{
 		ID:           0,
-		Title:        "Local review: " + branch,
+		Title:        title,
 		Author:       author,
 		SourceBranch: branch,
-		TargetBranch: p.baseBranch,
+		TargetBranch: targetBranch,
 		State:        "local",
 		HeadCommit:   head,
-		BaseCommit:   mergeBase,
+		BaseCommit:   diffBase,
 		Files:        files,
 		DiffHunks:    hunks,
 	}, nil
@@ -115,9 +134,11 @@ func (p *Provider) validate(ctx context.Context) error {
 	if _, err := p.git(ctx, "rev-parse", "--git-dir"); err != nil {
 		return fmt.Errorf("not a git repository: %w", err)
 	}
-	// Verify the base branch is resolvable.
-	if _, err := p.git(ctx, "rev-parse", "--verify", p.baseBranch); err != nil {
-		return fmt.Errorf("base branch %q not found: %w", p.baseBranch, err)
+	// Verify the base branch is resolvable (not needed in uncommitted mode).
+	if !p.uncommitted {
+		if _, err := p.git(ctx, "rev-parse", "--verify", p.baseBranch); err != nil {
+			return fmt.Errorf("base branch %q not found: %w", p.baseBranch, err)
+		}
 	}
 	return nil
 }

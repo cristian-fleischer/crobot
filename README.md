@@ -545,15 +545,19 @@ crobot export-pr-context --local
 
 # Local changes against a different base branch
 crobot export-pr-context --local --base main
+
+# Only uncommitted changes (staged + unstaged)
+crobot export-pr-context --local --uncommitted
 ```
 
-| Flag          | Type   | Required | Default  | Description                                    |
-|---------------|--------|----------|----------|------------------------------------------------|
-| `--workspace` | string | no*      |          | Workspace/organization slug                    |
-| `--repo`      | string | no*      |          | Repository slug                                |
-| `--pr`        | int    | no**     |          | Pull request number                            |
-| `--local`     | bool   | no**     | `false`  | Export local git changes instead of a PR        |
-| `--base`      | string | no       | `master` | Base branch for local mode (used with --local) |
+| Flag            | Type   | Required | Default  | Description                                             |
+|-----------------|--------|----------|----------|---------------------------------------------------------|
+| `--workspace`   | string | no*      |          | Workspace/organization slug                             |
+| `--repo`        | string | no*      |          | Repository slug                                         |
+| `--pr`          | int    | no**     |          | Pull request number                                     |
+| `--local`       | bool   | no**     | `false`  | Export local git changes instead of a PR                 |
+| `--uncommitted` | bool   | no       | `false`  | Only diff uncommitted changes against HEAD (with --local)|
+| `--base`        | string | no       | `master` | Base branch for local mode (used with --local)           |
 
 *Required unless set in config file or env vars.
 **Either `--pr` or `--local` must be specified.
@@ -614,18 +618,19 @@ crobot apply-review-findings --local --input findings.json
 cat findings.json | crobot apply-review-findings --pr 42 --input - --write --max-comments 10
 ```
 
-| Flag             | Type   | Required | Default  | Description                                      |
-|------------------|--------|----------|----------|--------------------------------------------------|
-| `--workspace`    | string | no*      |          | Workspace/organization slug                      |
-| `--repo`         | string | no*      |          | Repository slug                                  |
-| `--pr`           | int    | no**     |          | Pull request number                              |
-| `--local`        | bool   | no**     | `false`  | Validate and render findings locally (no PR)     |
-| `--base`         | string | no       | `master` | Base branch for local mode (used with --local)   |
-| `--input`        | string | yes      |          | Path to findings JSON file (`-` for stdin)       |
-| `--dry-run`      | bool   | no       | `true`   | Validate without posting (default behavior)      |
-| `--write`        | bool   | no       | `false`  | Actually post comments to the PR                 |
-| `--max-comments` | int    | no       | config   | Max comments to post (`0` = unlimited)           |
-| `--threshold`    | string | no       | config   | Minimum severity: `info`, `warning`, `error`     |
+| Flag             | Type   | Required | Default  | Description                                              |
+|------------------|--------|----------|----------|----------------------------------------------------------|
+| `--workspace`    | string | no*      |          | Workspace/organization slug                              |
+| `--repo`         | string | no*      |          | Repository slug                                          |
+| `--pr`           | int    | no**     |          | Pull request number                                      |
+| `--local`        | bool   | no**     | `false`  | Validate and render findings locally (no PR)              |
+| `--uncommitted`  | bool   | no       | `false`  | Only diff uncommitted changes against HEAD (with --local) |
+| `--base`         | string | no       | `master` | Base branch for local mode (used with --local)            |
+| `--input`        | string | yes      |          | Path to findings JSON file (`-` for stdin)                |
+| `--dry-run`      | bool   | no       | `true`   | Validate without posting (default behavior)               |
+| `--write`        | bool   | no       | `false`  | Actually post comments to the PR                          |
+| `--max-comments` | int    | no       | config   | Max comments to post (`0` = unlimited)                    |
+| `--threshold`    | string | no       | config   | Minimum severity: `info`, `warning`, `error`              |
 
 *Required unless set in config file or env vars.
 **Either `--pr` or `--local` must be specified.
@@ -641,7 +646,9 @@ The diff directory is cleaned up automatically after the review completes.
 
 When no PR is specified, CRoBot enters **local mode**: it diffs the working tree
 (committed, staged, and unstaged changes) against a base branch and renders
-findings directly in the terminal. Local mode always runs as dry-run.
+findings directly in the terminal. Local mode always runs as dry-run. Use
+`--uncommitted` to review only uncommitted changes (staged + unstaged) against
+HEAD.
 
 ```bash
 # Review local changes against master (no PR needed)
@@ -649,6 +656,9 @@ crobot review
 
 # Review local changes against a different base branch
 crobot review --base main
+
+# Review only uncommitted changes
+crobot review --uncommitted
 
 # Using a PR URL (simplest, workspace and repo deduced from the URL)
 crobot review https://bitbucket.org/myteam/my-service/pull-requests/42
@@ -689,6 +699,7 @@ The PR reference (URL or number) can be passed as a positional argument or via
 | `--workspace`         | string | no**     |            | Workspace/organization slug                              |
 | `--repo`              | string | no**     |            | Repository slug                                          |
 | `--base`              | string | no       | `master`   | Base branch for local review (when no PR is specified)   |
+| `--uncommitted`       | bool   | no       | `false`    | Only diff uncommitted changes against HEAD (local mode)  |
 | `--agent`             | string | no       | config     | ACP agent name (from `agent.agents` in config)           |
 | `--agent-command`     | string | no       |            | ACP agent command with args, e.g. `"gemini --experimental-acp"` |
 | `-m`, `--model`       | string | no       | config     | Model ID to use, or `"ask"` for interactive selection    |

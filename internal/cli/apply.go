@@ -26,6 +26,7 @@ func newApplyCmd() *cobra.Command {
 		maxComments int
 		threshold   string
 		local       bool
+		uncommitted bool
 		base        string
 	)
 
@@ -98,7 +99,12 @@ Local mode always runs as dry-run and renders findings with diff context.`,
 			var req platform.PRRequest
 
 			if local {
-				localPlat := localplatform.New(base, ".")
+				var localPlat *localplatform.Provider
+				if uncommitted {
+					localPlat = localplatform.NewUncommitted(".")
+				} else {
+					localPlat = localplatform.New(base, ".")
+				}
 				plat = localPlat
 				req = platform.PRRequest{
 					Workspace: "local",
@@ -182,6 +188,7 @@ Local mode always runs as dry-run and renders findings with diff context.`,
 	cmd.Flags().IntVar(&maxComments, "max-comments", 0, "Maximum number of comments to post (0 = unlimited; omit to use config default)")
 	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
 	cmd.Flags().BoolVar(&local, "local", false, "Validate and render findings locally (no PR needed)")
+	cmd.Flags().BoolVar(&uncommitted, "uncommitted", false, "Only diff uncommitted changes against HEAD (used with --local)")
 	cmd.Flags().StringVar(&base, "base", "master", "Base branch for local mode (used with --local)")
 
 	return cmd

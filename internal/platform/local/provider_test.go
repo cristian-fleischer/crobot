@@ -129,6 +129,88 @@ func TestGetPRContext(t *testing.T) {
 	}
 }
 
+func TestGetPRContext_Uncommitted(t *testing.T) {
+	dir := setupTestRepo(t)
+	p := NewUncommitted(dir)
+
+	ctx := context.Background()
+	prCtx, err := p.GetPRContext(ctx, prRequest())
+	if err != nil {
+		t.Fatalf("GetPRContext failed: %v", err)
+	}
+
+	if prCtx.Title != "Local review (uncommitted): feature" {
+		t.Errorf("Title = %q, want %q", prCtx.Title, "Local review (uncommitted): feature")
+	}
+	// TargetBranch should be the current branch (HEAD), not "master".
+	if prCtx.TargetBranch != "feature" {
+		t.Errorf("TargetBranch = %q, want %q", prCtx.TargetBranch, "feature")
+	}
+	// BaseCommit should equal HeadCommit (both are HEAD).
+	if prCtx.BaseCommit != prCtx.HeadCommit {
+		t.Errorf("BaseCommit = %q, want HeadCommit %q", prCtx.BaseCommit, prCtx.HeadCommit)
+	}
+
+	// Should only see hello.txt (the unstaged change), not new.txt (already committed).
+	if len(prCtx.Files) != 1 {
+		t.Fatalf("Files count = %d, want 1 (only uncommitted changes)", len(prCtx.Files))
+	}
+	if prCtx.Files[0].Path != "hello.txt" {
+		t.Errorf("Files[0].Path = %q, want %q", prCtx.Files[0].Path, "hello.txt")
+	}
+
+	// The diff should show only "hello world!!!" (uncommitted), not the committed changes.
+	if len(prCtx.DiffHunks) == 0 {
+		t.Fatal("DiffHunks is empty, want at least 1")
+	}
+	found := false
+	for _, h := range prCtx.DiffHunks {
+		if h.Path == "hello.txt" && containsString(h.Body, "hello world!!!") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("diff should include uncommitted change (hello world!!!)")
+	}
+}
+
+func TestGetPRContext_Uncommitted_NoChanges(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test",
+			"GIT_AUTHOR_EMAIL=test@test.com",
+			"GIT_COMMITTER_NAME=Test",
+			"GIT_COMMITTER_EMAIL=test@test.com",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %s\n%s", args, err, out)
+		}
+	}
+
+	run("init", "-b", "master")
+	run("config", "user.name", "Test")
+	run("config", "user.email", "test@test.com")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "f.txt")
+	run("commit", "-m", "init")
+
+	p := NewUncommitted(dir)
+	prCtx, err := p.GetPRContext(context.Background(), prRequest())
+	if err != nil {
+		t.Fatalf("GetPRContext failed: %v", err)
+	}
+	if len(prCtx.Files) != 0 {
+		t.Errorf("Files count = %d, want 0 (no uncommitted changes)", len(prCtx.Files))
+	}
+}
+
 func TestGetPRContext_NoChanges(t *testing.T) {
 	dir := t.TempDir()
 	run := func(args ...string) {

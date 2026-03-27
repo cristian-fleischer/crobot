@@ -13,6 +13,9 @@ import (
 // bbComment is the Bitbucket API representation of a pull request comment.
 type bbComment struct {
 	ID      int `json:"id"`
+	Parent  *struct {
+		ID int `json:"id"`
+	} `json:"parent"`
 	Content struct {
 		Raw string `json:"raw"`
 	} `json:"content"`
@@ -24,7 +27,12 @@ type bbComment struct {
 	User struct {
 		DisplayName string `json:"display_name"`
 	} `json:"user"`
-	CreatedOn string `json:"created_on"`
+	CreatedOn  string `json:"created_on"`
+	Resolution *struct {
+		User struct {
+			DisplayName string `json:"display_name"`
+		} `json:"user"`
+	} `json:"resolution"`
 }
 
 // bbCommentCreatePayload is the request body for creating a Bitbucket comment.
@@ -161,6 +169,79 @@ func (c *Client) CreateInlineComment(ctx context.Context, opts platform.PRReques
 	}
 
 	return result, nil
+}
+
+// ListPRComments retrieves all inline comments on a pull request, including
+// their resolution status.
+func (c *Client) ListPRComments(ctx context.Context, opts platform.PRRequest) ([]platform.Comment, error) {
+	workspace := c.resolveWorkspace(opts.Workspace)
+
+	basePath := fmt.Sprintf("/2.0/repositories/%s/%s/pullrequests/%d/comments",
+		url.PathEscape(workspace), url.PathEscape(opts.Repo), opts.PRNumber)
+
+	var allComments []platform.Comment
+
+	data, err := c.do(ctx, "GET", basePath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing PR comments: %w", err)
+	}
+
+	for {
+		var page paginatedResponse
+		if err := json.Unmarshal(data, &page); err != nil {
+			return nil, fmt.Errorf("decoding comments page: %w", err)
+		}
+
+		var comments []bbComment
+		if err := json.Unmarshal(page.Values, &comments); err != nil {
+			return nil, fmt.Errorf("decoding comments entries: %w", err)
+		}
+
+		for _, bc := range comments {
+			// Skip non-inline comments (PR-level activity comments).
+			if bc.Inline == nil {
+				continue
+			}
+
+			allComments = append(allComments, convertBBComment(bc))
+		}
+
+		if page.Next == "" {
+			break
+		}
+
+		data, err = c.doURL(ctx, page.Next)
+		if err != nil {
+			return nil, fmt.Errorf("fetching comments next page: %w", err)
+		}
+	}
+
+	return allComments, nil
+}
+
+// convertBBComment converts a Bitbucket API comment to a platform.Comment.
+func convertBBComment(bc bbComment) platform.Comment {
+	comment := platform.Comment{
+		ID:          strconv.Itoa(bc.ID),
+		Body:        bc.Content.Raw,
+		Author:      bc.User.DisplayName,
+		CreatedAt:   bc.CreatedOn,
+		IsBot:       platform.ExtractFingerprint(bc.Content.Raw) != "",
+		IsResolved:  bc.Resolution != nil,
+		Fingerprint: platform.ExtractFingerprint(bc.Content.Raw),
+	}
+	if bc.Parent != nil {
+		comment.ParentID = strconv.Itoa(bc.Parent.ID)
+	}
+	if bc.Inline != nil {
+		comment.Path = bc.Inline.Path
+		if bc.Inline.To != nil {
+			comment.Line = *bc.Inline.To
+		} else if bc.Inline.From != nil {
+			comment.Line = *bc.Inline.From
+		}
+	}
+	return comment
 }
 
 // DeleteComment removes a previously posted comment from a pull request.

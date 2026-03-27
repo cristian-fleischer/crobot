@@ -12,14 +12,15 @@ import (
 
 // ghComment is the GitHub API representation of a pull request review comment.
 type ghComment struct {
-	ID        int    `json:"id"`
-	Body      string `json:"body"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Side      string `json:"side"` // "LEFT" or "RIGHT"
-	CommitID  string `json:"commit_id"`
-	User      ghUser `json:"user"`
-	CreatedAt string `json:"created_at"`
+	ID           int    `json:"id"`
+	Body         string `json:"body"`
+	Path         string `json:"path"`
+	Line         int    `json:"line"`
+	Side         string `json:"side"` // "LEFT" or "RIGHT"
+	CommitID     string `json:"commit_id"`
+	InReplyToID  *int   `json:"in_reply_to_id"`
+	User         ghUser `json:"user"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // ghCreateComment is the request body for creating a GitHub review comment.
@@ -82,6 +83,59 @@ func (c *Client) ListBotComments(ctx context.Context, opts platform.PRRequest) (
 	}
 
 	return botComments, nil
+}
+
+// ListPRComments retrieves all review comments on a pull request.
+// Note: GitHub's REST API does not expose per-comment resolution status;
+// IsResolved will always be false. Thread resolution requires the GraphQL API.
+func (c *Client) ListPRComments(ctx context.Context, opts platform.PRRequest) ([]platform.Comment, error) {
+	owner := c.resolveOwner(opts.Workspace)
+
+	basePath := fmt.Sprintf("/repos/%s/%s/pulls/%d/comments",
+		url.PathEscape(owner), url.PathEscape(opts.Repo), opts.PRNumber)
+
+	var allComments []platform.Comment
+
+	data, headers, err := c.do(ctx, "GET", formatPerPage(basePath), nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing PR comments: %w", err)
+	}
+
+	for {
+		var comments []ghComment
+		if err := json.Unmarshal(data, &comments); err != nil {
+			return nil, fmt.Errorf("decoding comments page: %w", err)
+		}
+
+		for _, gc := range comments {
+			comment := platform.Comment{
+				ID:          strconv.Itoa(gc.ID),
+				Path:        gc.Path,
+				Line:        gc.Line,
+				Body:        gc.Body,
+				Author:      gc.User.Login,
+				CreatedAt:   gc.CreatedAt,
+				IsBot:       gc.User.Type == "Bot" || platform.ExtractFingerprint(gc.Body) != "",
+				Fingerprint: platform.ExtractFingerprint(gc.Body),
+			}
+			if gc.InReplyToID != nil {
+				comment.ParentID = strconv.Itoa(*gc.InReplyToID)
+			}
+			allComments = append(allComments, comment)
+		}
+
+		next := parseLinkNext(headers)
+		if next == "" {
+			break
+		}
+
+		data, headers, err = c.doURL(ctx, next)
+		if err != nil {
+			return nil, fmt.Errorf("fetching comments next page: %w", err)
+		}
+	}
+
+	return allComments, nil
 }
 
 // CreateInlineComment posts a single inline review comment on a pull request.

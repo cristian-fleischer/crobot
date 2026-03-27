@@ -18,6 +18,9 @@ type Platform interface {
 	// specified pull request.
 	ListBotComments(ctx context.Context, opts PRRequest) ([]Comment, error)
 
+	// ListPRComments returns all inline comments on the specified pull request.
+	ListPRComments(ctx context.Context, opts PRRequest) ([]Comment, error)
+
 	// CreateInlineComment posts a single inline comment on a pull request.
 	CreateInlineComment(ctx context.Context, opts PRRequest, comment InlineComment) (*Comment, error)
 

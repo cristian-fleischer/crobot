@@ -59,6 +59,10 @@ func (m *mockPlatform) CreateInlineComment(_ context.Context, _ platform.PRReque
 	}, nil
 }
 
+func (m *mockPlatform) ListPRComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
+	return nil, nil
+}
+
 func (m *mockPlatform) DeleteComment(_ context.Context, _ platform.PRRequest, _ string) error {
 	return nil
 }

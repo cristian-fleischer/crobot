@@ -9,8 +9,8 @@ func TestToolDefinitions_Count(t *testing.T) {
 	t.Parallel()
 
 	defs := toolDefinitions()
-	if len(defs) != 5 {
-		t.Errorf("expected 5 tool definitions, got %d", len(defs))
+	if len(defs) != 6 {
+		t.Errorf("expected 6 tool definitions, got %d", len(defs))
 	}
 }
 
@@ -21,6 +21,7 @@ func TestToolDefinitions_Names(t *testing.T) {
 		"export_pr_context",
 		"get_file_snippet",
 		"list_bot_comments",
+		"list_pr_comments",
 		"export_local_context",
 		"apply_review_findings",
 	}
@@ -83,6 +84,7 @@ func TestToolDefinitions_InputSchemaHasRequiredFields(t *testing.T) {
 		"export_pr_context":     {"workspace", "repo", "pr"},
 		"get_file_snippet":      {"workspace", "repo", "commit", "path", "line"},
 		"list_bot_comments":     {"workspace", "repo", "pr"},
+		"list_pr_comments":      {"workspace", "repo", "pr"},
 		"export_local_context":  {},
 		"apply_review_findings": {"workspace", "repo", "pr", "findings"},
 	}

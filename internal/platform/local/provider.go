@@ -119,6 +119,11 @@ func (p *Provider) ListBotComments(_ context.Context, _ platform.PRRequest) ([]p
 	return nil, nil
 }
 
+// ListPRComments returns an empty slice — there are no existing comments in local mode.
+func (p *Provider) ListPRComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
+	return nil, nil
+}
+
 // CreateInlineComment is not supported in local mode.
 func (p *Provider) CreateInlineComment(_ context.Context, _ platform.PRRequest, _ platform.InlineComment) (*platform.Comment, error) {
 	return nil, fmt.Errorf("local mode does not support posting comments")

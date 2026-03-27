@@ -67,5 +67,7 @@ type Comment struct {
 	Author      string `json:"author"`
 	CreatedAt   string `json:"created_at"`
 	IsBot       bool   `json:"is_bot"`
+	IsResolved  bool   `json:"is_resolved"`
 	Fingerprint string `json:"fingerprint,omitempty"`
+	ParentID    string `json:"parent_id,omitempty"`
 }

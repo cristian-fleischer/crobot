@@ -192,6 +192,7 @@ integrations.
   - [`export-pr-context`](#export-pr-context)
   - [`get-file-snippet`](#get-file-snippet)
   - [`list-bot-comments`](#list-bot-comments)
+  - [`list-pr-comments`](#list-pr-comments)
   - [`apply-review-findings`](#apply-review-findings)
   - [`review`](#review)
   - [`models`](#models)
@@ -596,6 +597,31 @@ crobot list-bot-comments --workspace <ws> --repo <repo> --pr <number>
 | `--workspace` | string | no*      |         | Workspace/organization slug                    |
 | `--repo`      | string | no*      |         | Repository slug                                |
 | `--pr`        | int    | yes      |         | Pull request number                            |
+
+*Required unless set in config file or env vars.
+
+### `list-pr-comments`
+
+Lists all inline review comments on a PR as JSON to stdout.
+Use `--unresolved` to filter to only open (unresolved) comments.
+
+> **Note:** GitHub's REST API does not expose per-comment resolution status;
+> on GitHub all comments will have `is_resolved=false`.
+
+```bash
+# List all inline comments
+crobot list-pr-comments --pr 42
+
+# List only unresolved comments
+crobot list-pr-comments --pr 42 --unresolved
+```
+
+| Flag           | Type   | Required | Default | Description                       |
+|----------------|--------|----------|---------|-----------------------------------|
+| `--workspace`  | string | no*      |         | Workspace/organization slug       |
+| `--repo`       | string | no*      |         | Repository slug                   |
+| `--pr`         | int    | yes      |         | Pull request number               |
+| `--unresolved` | bool   | no       | `false` | Only show unresolved comments     |
 
 *Required unless set in config file or env vars.
 
@@ -1161,6 +1187,7 @@ The agent then has direct access to the following tools:
 - **`export_local_context`** -- Build PR context from local git state (for pre-push reviews). Also writes diffs to disk.
 - **`get_file_snippet`** -- Retrieve a slice of a file at a specific commit with surrounding context.
 - **`list_bot_comments`** -- List existing CRoBot comments on a PR.
+- **`list_pr_comments`** -- List all inline review comments on a PR, with optional `unresolved` filter.
 - **`apply_review_findings`** -- Validate, deduplicate, and post review findings as inline PR comments.
 
 No shell commands needed. The `apply_review_findings` tool defaults to dry-run

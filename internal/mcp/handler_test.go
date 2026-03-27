@@ -36,6 +36,8 @@ type mockPlatform struct {
 	fileContentErr error
 	botComments    []platform.Comment
 	botCommentsErr error
+	prComments     []platform.Comment
+	prCommentsErr  error
 	createComment  *platform.Comment
 	createErr      error
 	deleteErr      error
@@ -51,6 +53,10 @@ func (m *mockPlatform) GetFileContent(_ context.Context, _ platform.FileRequest)
 
 func (m *mockPlatform) ListBotComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
 	return m.botComments, m.botCommentsErr
+}
+
+func (m *mockPlatform) ListPRComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
+	return m.prComments, m.prCommentsErr
 }
 
 func (m *mockPlatform) CreateInlineComment(_ context.Context, _ platform.PRRequest, _ platform.InlineComment) (*platform.Comment, error) {

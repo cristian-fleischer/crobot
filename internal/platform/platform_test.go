@@ -461,6 +461,9 @@ func (stubPlatform) GetFileContent(_ context.Context, _ platform.FileRequest) ([
 func (stubPlatform) ListBotComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
 	return nil, nil
 }
+func (stubPlatform) ListPRComments(_ context.Context, _ platform.PRRequest) ([]platform.Comment, error) {
+	return nil, nil
+}
 func (stubPlatform) CreateInlineComment(_ context.Context, _ platform.PRRequest, _ platform.InlineComment) (*platform.Comment, error) {
 	return nil, nil
 }

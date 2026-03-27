@@ -47,6 +47,8 @@ func (h *handler) dispatch(name string) func(ctx context.Context, req mcp.CallTo
 			return h.handleGetFileSnippet(ctx, req)
 		case "list_bot_comments":
 			return h.handleListBotComments(ctx, req)
+		case "list_pr_comments":
+			return h.handleListPRComments(ctx, req)
 		case "export_local_context":
 			return h.handleExportLocalContext(ctx, req)
 		case "apply_review_findings":
@@ -164,6 +166,44 @@ func (h *handler) handleListBotComments(ctx context.Context, req mcp.CallToolReq
 	})
 	if err != nil {
 		return toolError("failed to list bot comments", err), nil
+	}
+
+	data, err := json.MarshalIndent(comments, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshaling comments: %w", err)
+	}
+
+	return mcp.NewToolResultText(string(data)), nil
+}
+
+// handleListPRComments fetches and returns all inline comments on a PR.
+func (h *handler) handleListPRComments(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	workspace := mcp.ParseString(req, "workspace", "")
+	repo := mcp.ParseString(req, "repo", "")
+	pr := mcp.ParseInt(req, "pr", 0)
+	unresolved := mcp.ParseBoolean(req, "unresolved", false)
+
+	if workspace == "" || repo == "" || pr <= 0 {
+		return mcp.NewToolResultError("workspace, repo, and pr are required"), nil
+	}
+
+	comments, err := h.platform.ListPRComments(ctx, platform.PRRequest{
+		Workspace: workspace,
+		Repo:      repo,
+		PRNumber:  pr,
+	})
+	if err != nil {
+		return toolError("failed to list PR comments", err), nil
+	}
+
+	if unresolved {
+		filtered := comments[:0]
+		for _, c := range comments {
+			if !c.IsResolved {
+				filtered = append(filtered, c)
+			}
+		}
+		comments = filtered
 	}
 
 	data, err := json.MarshalIndent(comments, "", "  ")

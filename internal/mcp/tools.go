@@ -47,6 +47,17 @@ func toolDefinitions() []toolDef {
 			),
 		},
 		{
+			name: "list_pr_comments",
+			tool: mcp.NewTool("list_pr_comments",
+				mcp.WithDescription("List all inline review comments on a pull request. Use unresolved=true to filter to only open comments. Note: GitHub REST API does not expose resolution status."),
+				mcp.WithString("workspace", mcp.Required(), mcp.Description("Workspace or organization slug")),
+				mcp.WithString("repo", mcp.Required(), mcp.Description("Repository slug")),
+				mcp.WithNumber("pr", mcp.Required(), mcp.Description("Pull request number")),
+				mcp.WithBoolean("unresolved", mcp.Description("If true, only return unresolved (open) comments")),
+				mcp.WithReadOnlyHintAnnotation(true),
+			),
+		},
+		{
 			name: "export_local_context",
 			tool: mcp.NewTool("export_local_context",
 				mcp.WithDescription("Export local git changes (committed, staged, and unstaged) as a review context. "+

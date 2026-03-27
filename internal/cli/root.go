@@ -41,6 +41,7 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(newExportCmd())
 	cmd.AddCommand(newSnippetCmd())
 	cmd.AddCommand(newCommentsCmd())
+	cmd.AddCommand(newPRCommentsCmd())
 	cmd.AddCommand(newApplyCmd())
 	cmd.AddCommand(newServeCmd())
 	cmd.AddCommand(newInstructionsCmd())

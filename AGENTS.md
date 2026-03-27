@@ -25,7 +25,10 @@ crobot get-file-snippet --workspace <ws> --repo <repo> \
 # 3. List existing bot comments
 crobot list-bot-comments --workspace <ws> --repo <repo> --pr <number>
 
-# 4. Apply findings (dry-run first, then --write)
+# 4. List all PR comments (--unresolved to filter)
+crobot list-pr-comments --workspace <ws> --repo <repo> --pr <number> --unresolved
+
+# 5. Apply findings (dry-run first, then --write)
 crobot apply-review-findings --workspace <ws> --repo <repo> --pr <number> \
   --input findings.json --dry-run
 crobot apply-review-findings --workspace <ws> --repo <repo> --pr <number> \

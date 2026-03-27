@@ -565,9 +565,10 @@ step_credentials_bitbucket() {
   info "Bitbucket Cloud credentials."
   info "Create an API token at: https://id.atlassian.com/manage-profile/security/api-tokens"
   echo ""
-  info "Find your workspace and repo in the url you use to access your bitbucket repo."
+  info "Find your workspace and repo in the URL you use to access your Bitbucket repo."
   info "URL format: https://bitbucket.org/{workspace}/{repo}/src/master/"
-  info "Find your username at: https://bitbucket.org/account/settings/"
+  info "Find your email at: https://id.atlassian.com/manage-profile/email"
+  info "Note: Bitbucket API auth requires your Atlassian account email (not your Bitbucket username)."
   echo ""
 
   bb_workspace=$(prompt "Workspace slug" "$bb_workspace")
@@ -578,7 +579,7 @@ step_credentials_bitbucket() {
     bb_repo=$(prompt "Repository slug (optional, press Enter to skip)" "$bb_repo")
   fi
 
-  bb_user=$(prompt "User (email or username)" "$bb_user")
+  bb_user=$(prompt "Atlassian account email" "$bb_user")
 
   local token_hint=""
   if [[ -n "$bb_token" ]]; then

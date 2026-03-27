@@ -973,7 +973,7 @@ Environment variables override config file values.
 | `CROBOT_PLATFORM`              | Platform to use                                  | `bitbucket`  |
 | `CROBOT_BITBUCKET_WORKSPACE`   | Bitbucket workspace/team slug                    |              |
 | `CROBOT_BITBUCKET_REPO`        | Bitbucket repository slug                        |              |
-| `CROBOT_BITBUCKET_USER`        | Bitbucket username/email for API auth            |              |
+| `CROBOT_BITBUCKET_USER`        | Atlassian account email for API auth             |              |
 | `CROBOT_BITBUCKET_TOKEN`       | Bitbucket API token                              |              |
 | `CROBOT_GITHUB_OWNER`          | GitHub repository owner (user or org)            |              |
 | `CROBOT_GITHUB_REPO`           | GitHub repository name                           |              |
@@ -1145,8 +1145,8 @@ Add a `.mcp.json` to your project root:
       "args": ["serve", "--mcp"],
       "env": {
         "CROBOT_PLATFORM": "bitbucket",
-        "CROBOT_BITBUCKET_USER": "your-username",
-        "CROBOT_BITBUCKET_TOKEN": "your-app-password",
+        "CROBOT_BITBUCKET_USER": "you@example.com",
+        "CROBOT_BITBUCKET_TOKEN": "your-api-token",
         "CROBOT_BITBUCKET_WORKSPACE": "your-workspace",
         "CROBOT_BITBUCKET_REPO": "your-repo"
       }

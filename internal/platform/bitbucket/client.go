@@ -30,7 +30,7 @@ const (
 type Config struct {
 	// Workspace is the Bitbucket workspace slug.
 	Workspace string
-	// User is the Bitbucket username or email for authentication.
+	// User is the Atlassian account email for API authentication.
 	User string
 	// Token is the Bitbucket API token (app password) for authentication.
 	Token string
@@ -65,7 +65,7 @@ func NewClient(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("bitbucket: config must not be nil")
 	}
 	if cfg.User == "" {
-		return nil, fmt.Errorf("bitbucket: user must not be empty")
+		return nil, fmt.Errorf("bitbucket: user must not be empty (use your Atlassian account email, not your Bitbucket username)")
 	}
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("bitbucket: token must not be empty")

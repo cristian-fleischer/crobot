@@ -47,7 +47,8 @@ type BitbucketConfig struct {
 	// Repo is the default Bitbucket repository slug.
 	Repo string `yaml:"repo"`
 
-	// User is the Bitbucket username or email for API authentication.
+	// User is the Atlassian account email for API authentication.
+	// Bitbucket API requires the email (not the Bitbucket username).
 	User string `yaml:"user"`
 
 	// Token is the Bitbucket API token for authentication.

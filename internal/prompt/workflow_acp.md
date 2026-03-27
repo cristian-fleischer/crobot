@@ -23,6 +23,12 @@ prior findings:
 crobot list-bot-comments --workspace <ws> --repo <repo> --pr <number>
 ```
 
+To see all open review threads (not just bot comments), use `list-pr-comments`:
+
+```bash
+crobot list-pr-comments --workspace <ws> --repo <repo> --pr <number> --unresolved
+```
+
 This is optional — CRoBot also deduplicates on its side after you return.
 
 ### What NOT to do

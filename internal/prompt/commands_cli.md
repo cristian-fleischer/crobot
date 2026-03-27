@@ -28,6 +28,15 @@ Use `head_commit` from the exported context. Default context: 5 lines.
 crobot list-bot-comments --pr <number>
 ```
 
+### List PR Comments
+```bash
+# All inline comments
+crobot list-pr-comments --pr <number>
+
+# Only unresolved comments
+crobot list-pr-comments --pr <number> --unresolved
+```
+
 ### Apply Review Findings
 ```bash
 # Dry run (default — always do this first)

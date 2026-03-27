@@ -35,7 +35,11 @@ file index, then read individual file diffs as needed.
 ### 3. Check for existing comments (PR mode only)
 
 ```bash
+# CRoBot's own comments (for deduplication)
 crobot list-bot-comments --pr <number>
+
+# All inline comments (use --unresolved to see open review threads)
+crobot list-pr-comments --pr <number> --unresolved
 ```
 
 Skip this step for local reviews.

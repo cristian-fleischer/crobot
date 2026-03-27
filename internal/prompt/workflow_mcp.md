@@ -17,6 +17,8 @@ Follow these steps in order when reviewing a pull request:
 3. For each primary file, read the full file from disk. Trace call chains, check
    callers, verify consistency with existing patterns.
 4. Call `list_bot_comments` to check for existing reviews and avoid duplicates.
+   Optionally call `list_pr_comments` (with `unresolved: true`) to see all open
+   review threads on the PR.
 5. Formulate findings with specific messages and remediation code in the
    `suggestion` field.
 6. Call `apply_review_findings` with `dry_run: true` to validate.

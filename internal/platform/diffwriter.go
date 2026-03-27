@@ -35,6 +35,11 @@ func CleanupStaleDiffDirs(baseDir string) error {
 // file at outputDir/<path> contains the formatted unified diff hunks. The
 // index at outputDir/.crobot-index.md lists all files with stats.
 func WriteDiffFiles(hunks []DiffHunk, stats DiffStats, outputDir string) error {
+	// Ensure output directory exists.
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("creating output dir: %w", err)
+	}
+
 	// Group hunks by file.
 	hunksByFile := make(map[string][]DiffHunk)
 	for _, h := range hunks {

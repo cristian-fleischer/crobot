@@ -9,6 +9,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/cristian-fleischer/crobot/internal/config"
 	"github.com/cristian-fleischer/crobot/internal/platform"
@@ -36,8 +37,9 @@ func NewServer(plat platform.Platform, cfg config.Config) (*Server, error) {
 		server.WithInstructions(instructions),
 	)
 
-	// Clean up stale diff dirs from prior (possibly killed) sessions.
-	if err := platform.CleanupStaleDiffDirs(".crobot"); err != nil {
+	// Clean up stale diff dirs from prior (possibly killed) sessions. Only
+	// remove dirs older than 24h so concurrent reviews are not affected.
+	if err := platform.CleanupStaleDiffDirs(".crobot", 24*time.Hour); err != nil {
 		slog.Warn("failed to clean stale diff dirs", "error", err)
 	}
 

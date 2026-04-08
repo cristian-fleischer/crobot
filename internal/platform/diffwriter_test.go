@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewDiffDir(t *testing.T) {
@@ -155,29 +156,36 @@ func TestCleanupStaleDiffDirs(t *testing.T) {
 
 	baseDir := t.TempDir()
 
-	// Create some fake diff dirs.
-	dir1 := filepath.Join(baseDir, "diffs-111")
-	dir2 := filepath.Join(baseDir, "diffs-222")
+	// Old diff dir: mtime backdated well before the cutoff.
+	oldDir := filepath.Join(baseDir, "diffs-111")
+	// Fresh diff dir: represents a concurrent review that should be skipped.
+	freshDir := filepath.Join(baseDir, "diffs-222")
 	other := filepath.Join(baseDir, "config.yaml")
 
-	os.MkdirAll(dir1, 0o755)
-	os.MkdirAll(dir2, 0o755)
-	os.WriteFile(filepath.Join(dir1, "test.go"), []byte("test"), 0o644)
+	os.MkdirAll(oldDir, 0o755)
+	os.MkdirAll(freshDir, 0o755)
+	os.WriteFile(filepath.Join(oldDir, "test.go"), []byte("test"), 0o644)
+	os.WriteFile(filepath.Join(freshDir, "test.go"), []byte("test"), 0o644)
 	os.WriteFile(other, []byte("keep"), 0o644)
 
-	err := CleanupStaleDiffDirs(baseDir)
-	if err != nil {
+	// Backdate the old dir so it falls outside the 1h window.
+	oldTime := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(oldDir, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	if err := CleanupStaleDiffDirs(baseDir, time.Hour); err != nil {
 		t.Fatalf("CleanupStaleDiffDirs: %v", err)
 	}
 
-	// Diff dirs should be gone.
-	if _, err := os.Stat(dir1); !os.IsNotExist(err) {
-		t.Error("dir1 should have been removed")
+	// Old dir should be gone.
+	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
+		t.Error("oldDir should have been removed")
 	}
-	if _, err := os.Stat(dir2); !os.IsNotExist(err) {
-		t.Error("dir2 should have been removed")
+	// Fresh dir should be preserved (concurrent-run protection).
+	if _, err := os.Stat(freshDir); err != nil {
+		t.Errorf("freshDir should have been preserved: %v", err)
 	}
-
 	// Other file should remain.
 	if _, err := os.Stat(other); err != nil {
 		t.Error("config.yaml should not have been removed")

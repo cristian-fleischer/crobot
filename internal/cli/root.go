@@ -6,10 +6,17 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
+	"github.com/cristian-fleischer/crobot/internal/platform"
 	"github.com/cristian-fleischer/crobot/internal/version"
 	"github.com/spf13/cobra"
 )
+
+// staleDiffMaxAge is the age threshold for startup cleanup of orphaned
+// .crobot/diffs-* directories. Anything younger is assumed to belong to a
+// concurrent review and is left alone.
+const staleDiffMaxAge = 24 * time.Hour
 
 // RootCmd returns the root cobra command for crobot.
 func RootCmd() *cobra.Command {
@@ -28,6 +35,13 @@ func RootCmd() *cobra.Command {
 				Level: level,
 			})
 			slog.SetDefault(slog.New(handler))
+
+			// Best-effort sweep of orphaned diff dirs from crashed runs.
+			// Only removes dirs older than staleDiffMaxAge so concurrent
+			// review/export runs are not disturbed.
+			if err := platform.CleanupStaleDiffDirs(".crobot", staleDiffMaxAge); err != nil {
+				slog.Warn("failed to clean stale diff dirs", "error", err)
+			}
 			return nil
 		},
 		SilenceUsage:  true,

@@ -15,15 +15,29 @@ func NewDiffDir(baseDir string) string {
 	return filepath.Join(baseDir, fmt.Sprintf("diffs-%d", time.Now().UnixNano()))
 }
 
-// CleanupStaleDiffDirs removes all .crobot/diffs-* directories under baseDir.
-// Safe to call at startup to clean up after killed processes.
-func CleanupStaleDiffDirs(baseDir string) error {
+// CleanupStaleDiffDirs removes .crobot/diffs-* directories under baseDir
+// whose modtime is older than maxAge. The age threshold protects concurrent
+// reviews: a sibling run's in-use directory has a recent modtime and is
+// skipped. Pass a small maxAge (e.g. 0) to remove all matches unconditionally,
+// though that is only safe when no other review is running.
+func CleanupStaleDiffDirs(baseDir string, maxAge time.Duration) error {
 	pattern := filepath.Join(baseDir, "diffs-*")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("globbing stale diff dirs: %w", err)
 	}
+	cutoff := time.Now().Add(-maxAge)
 	for _, m := range matches {
+		info, err := os.Stat(m)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("stat stale diff dir %s: %w", m, err)
+		}
+		if info.ModTime().After(cutoff) {
+			continue
+		}
 		if err := os.RemoveAll(m); err != nil {
 			return fmt.Errorf("removing stale diff dir %s: %w", m, err)
 		}

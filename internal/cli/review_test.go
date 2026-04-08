@@ -222,6 +222,38 @@ func TestReviewCmd_FlagParsing(t *testing.T) {
 	}
 }
 
+func TestResolveShowAgentOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		flagSet       bool
+		explicitValue bool
+		localMode     bool
+		dryRun        bool
+		want          bool
+	}{
+		{"explicit true always wins", true, true, false, false, true},
+		{"explicit false always wins even in local", true, false, true, true, false},
+		{"default off for remote write run", false, false, false, false, false},
+		{"default on for local mode", false, false, true, false, true},
+		{"default on for dry-run (non-write)", false, false, false, true, true},
+		{"default on for local + dry-run", false, false, true, true, true},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := resolveShowAgentOutput(tt.flagSet, tt.explicitValue, tt.localMode, tt.dryRun)
+			if got != tt.want {
+				t.Errorf("resolveShowAgentOutput(%v, %v, %v, %v) = %v, want %v",
+					tt.flagSet, tt.explicitValue, tt.localMode, tt.dryRun, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReviewCmd_AgentCommandFlag(t *testing.T) {
 	t.Parallel()
 

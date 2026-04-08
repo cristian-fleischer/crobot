@@ -89,10 +89,9 @@ Use --local to review local git changes instead of a PR.`,
 				return fmt.Errorf("fetching context: %w", err)
 			}
 
-			// Write per-file diffs to disk for agent consumption.
-			if err := platform.CleanupStaleDiffDirs(".crobot"); err != nil {
-				slog.Warn("failed to clean stale diff dirs", "error", err)
-			}
+			// Write per-file diffs to disk for agent consumption. Stale-dir
+			// cleanup runs once at CLI startup (see root.go); removing it
+			// here avoids clobbering concurrent review/export runs.
 			stats := platform.ComputeDiffStats(prCtx.DiffHunks)
 			diffDir := platform.NewDiffDir(".crobot")
 			if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {

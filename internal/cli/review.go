@@ -199,6 +199,17 @@ always runs as dry-run and renders findings to the terminal.`,
 				return fmt.Errorf("loading review philosophy: %w", err)
 			}
 
+			// 10. Default --show-agent-output to on for local-mode and
+			// dry-run (non-write) runs: in those cases the output is the
+			// primary user-visible result. Explicit --show-agent-output=false
+			// from the user still wins.
+			showAgentOutput = resolveShowAgentOutput(
+				cmd.Flags().Changed("show-agent-output"),
+				showAgentOutput,
+				isLocalMode,
+				isDryRun,
+			)
+
 			opts := ReviewOpts{
 				PRRequest:       *pr,
 				Platform:        plat,
@@ -237,7 +248,7 @@ always runs as dry-run and renders findings to the terminal.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "Repository slug")
 	cmd.Flags().IntVar(&maxComments, "max-comments", 0, "Maximum number of comments to post (0 = unlimited; omit to use config default)")
 	cmd.Flags().IntVarP(&timeoutSecs, "timeout", "t", 0, "Agent timeout in seconds (0 = use config default, currently 10m)")
-	cmd.Flags().BoolVar(&showAgentOutput, "show-agent-output", false, "Show the agent's stderr output during the review")
+	cmd.Flags().BoolVar(&showAgentOutput, "show-agent-output", false, "Show the agent's stderr output during the review (default: on for local and dry-run runs)")
 	cmd.Flags().BoolVar(&rawOutput, "raw", false, "Disable markdown formatting of agent output (use with --show-agent-output)")
 	cmd.Flags().StringVarP(&instructions, "instructions", "i", "", "Additional instructions appended to the review prompt")
 	cmd.Flags().StringVar(&philosophyFlag, "review-philosophy", "", "Path to a custom review philosophy markdown file")
@@ -245,6 +256,17 @@ always runs as dry-run and renders findings to the terminal.`,
 	cmd.Flags().BoolVar(&uncommitted, "uncommitted", false, "Only diff uncommitted changes against HEAD (local mode)")
 	cmd.Flags().StringVar(&threshold, "threshold", "", "Minimum severity threshold: info, warning, error (omit to use config default)")
 	return cmd
+}
+
+// resolveShowAgentOutput returns the effective value of --show-agent-output.
+// When the user explicitly sets the flag, that value is honored. Otherwise it
+// defaults to true in local-mode and dry-run (non-write) runs because the
+// agent's streamed output is the primary user-visible result in those modes.
+func resolveShowAgentOutput(flagSet, explicitValue, localMode, dryRun bool) bool {
+	if flagSet {
+		return explicitValue
+	}
+	return localMode || dryRun
 }
 
 // runReview executes the full AI-powered review pipeline: fetch PR context,
@@ -266,9 +288,9 @@ func runReview(ctx context.Context, opts ReviewOpts) (*review.ReviewResult, erro
 	}
 
 	// 1b. Write per-file diffs to disk for incremental agent consumption.
-	if err := platform.CleanupStaleDiffDirs(".crobot"); err != nil {
-		slog.Warn("failed to clean stale diff dirs", "error", err)
-	}
+	// Stale-dir cleanup runs once at CLI startup (see root.go); per-run
+	// cleanup is handled by the deferred CleanupDiffDir below, so two
+	// parallel reviews in the same workdir do not clobber each other.
 	stats := platform.ComputeDiffStats(prCtx.DiffHunks)
 	diffDir := platform.NewDiffDir(".crobot")
 	if err := platform.WriteDiffFiles(prCtx.DiffHunks, stats, diffDir); err != nil {

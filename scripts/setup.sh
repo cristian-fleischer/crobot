@@ -2,6 +2,17 @@
 # CRoBot Setup Wizard
 # Interactive setup for CRoBot — AI-powered code review bot.
 # https://github.com/cristian-fleischer/crobot
+
+# Require bash. When piped into a POSIX sh (e.g. dash), `set -o pipefail`,
+# `[[ ... ]]`, arrays, and other bashisms below would fail. Print a clear
+# message pointing at the correct invocation rather than crashing mid-wizard.
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "crobot setup: this script requires bash, not POSIX sh." >&2
+  echo "Re-run with:" >&2
+  echo "  curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | bash" >&2
+  exit 1
+fi
+
 set -euo pipefail
 
 # ---------------------------------------------------------------------------

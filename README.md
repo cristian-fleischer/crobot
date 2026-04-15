@@ -26,7 +26,7 @@ crobot review https://github.com/your-org/your-repo/pull/42 --write
 **Install** - run the setup wizard (installs binary + walks you through configuration):
 
 ```bash
-curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | sh
+curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scripts/setup.sh | bash
 ```
 
 > Run the setup wizard from your project directory to enable repo-specific

@@ -685,6 +685,9 @@ step_agent() {
   header "Agent Configuration"
 
   info "CRoBot needs an ACP-compatible agent to run orchestrated reviews."
+  info "Most agents need an ACP adapter, e.g.:"
+  info "  npm install -g @agentclientprotocol/claude-agent-acp   # Claude"
+  info "  npm install -g @agentclientprotocol/codex-acp          # Codex"
   echo ""
 
   agent_name=$(prompt "Agent name" "$agent_name")

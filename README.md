@@ -35,6 +35,15 @@ curl -sS https://raw.githubusercontent.com/cristian-fleischer/crobot/master/scri
 
 Or [install manually](https://github.com/cristian-fleischer/crobot/releases/latest).
 
+**Prerequisite for orchestrated reviews:** `crobot review` spawns an
+ACP-compatible agent. Most agents need an ACP adapter — install the one for
+your agent:
+
+```bash
+npm install -g @agentclientprotocol/claude-agent-acp   # Claude Code
+npm install -g @agentclientprotocol/codex-acp          # OpenAI Codex
+```
+
 **Review:**
 
 ```bash
@@ -970,10 +979,14 @@ agent:
   # subprocess that CRoBot can spawn.
   #
   # Most agents don't speak ACP natively. Use an ACP adapter:
-  #   npm install -g @zed-industries/claude-agent-acp
+  #   npm install -g @agentclientprotocol/claude-agent-acp   # Claude
+  #   npm install -g @agentclientprotocol/codex-acp          # Codex
   agents:
     claude:
       command: claude-agent-acp
+      args: []
+    codex:
+      command: codex-acp
       args: []
 
   # Overall timeout in seconds for the agent subprocess. Default: 600 (10 min).
@@ -1133,12 +1146,22 @@ and collect structured findings. The agent runs in a sandboxed, read-only mode:
 it can read files from the repository at the PR's head commit but cannot write
 files or run terminal commands.
 
-Most AI coding agents don't speak ACP natively. Use an ACP adapter such as
-[claude-agent-acp](https://github.com/zed-industries/claude-agent-acp):
+Most AI coding agents don't speak ACP natively. Use an ACP adapter. The
+[Agent Client Protocol](https://github.com/agentclientprotocol) organization
+maintains the official adapters:
 
 ```bash
-npm install -g @zed-industries/claude-agent-acp
+# Claude Code
+npm install -g @agentclientprotocol/claude-agent-acp
+
+# OpenAI Codex
+npm install -g @agentclientprotocol/codex-acp
 ```
+
+> **Note:** The former `@zed-industries/claude-agent-acp` and
+> `@zed-industries/codex-acp` packages are deprecated — both moved to the
+> `@agentclientprotocol` npm scope, where updates continue. The installed
+> binary names (`claude-agent-acp`, `codex-acp`) are unchanged.
 
 Configure agents in your config file:
 
@@ -1148,6 +1171,9 @@ agent:
   agents:
     claude:
       command: claude-agent-acp
+      args: []
+    codex:
+      command: codex-acp
       args: []
   timeout: 600
 ```

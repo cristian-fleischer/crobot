@@ -51,7 +51,7 @@ npm install -g @agentclientprotocol/codex-acp          # OpenAI Codex
 crobot review https://github.com/your-org/repo/pull/42 --write --show-agent-output
 
 # Review local changes before pushing (no PR needed)
-crobot review --show-agent-output
+crobot review
 ```
 
 ---
